@@ -1,0 +1,36 @@
+// Firefighters modification by IneQuation aka Rookie One
+// This mod may not be used or modified without my explicit permission
+
+main:
+	
+end
+
+announce_lead local.leader:
+	if (local.leader == "draw") {
+		if (level.clockside == allies) {
+			local.alliedmessage = "You have been tied for the lead!"
+			local.axismessage = "You have tied for the lead!"
+			local.specmessage = "The Allies have tied for the lead!"
+		} else if (level.clockside == axis) {
+			local.alliedmessage = "You have tied for the lead!"
+			local.axismessage = "You have been tied for the lead!"
+			local.specmessage = "The Axis have tied for the lead!"
+		}
+	} else if (local.leader == allies && level.clockside != allies) {
+		local.alliedmessage = "You have taken the lead!"
+		local.axismessage = "You have lost the lead!"
+		local.specmessage = "The Allies have taken the lead!"
+	} else if (local.leader == axis && level.clockside != axis) {
+		local.alliedmessage = "You have lost the lead!"
+		local.axismessage = "You have taken the lead!"
+		local.specmessage = "The Axis have taken the lead!"
+	}
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		if ($player[local.i].dmteam == allies)
+			$player[local.i] iprint (local.alliedmessage) 1
+		else if ($player[local.i].dmteam == axis)
+			$player[local.i] iprint (local.axismessage) 1
+		else
+			$player[local.i] iprint (local.specmessage) 1
+	}
+end

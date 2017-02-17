@@ -1,0 +1,36 @@
+// Firefighters modification by IneQuation aka Rookie One
+// This mod may not be used or modified without my explicit permission
+
+main local.arg:
+	if (local.arg == "stop") {
+		self.ff_firing = 0
+		end
+	} else if (local.arg == "start") {
+		self.ff_firing = 1
+		self loopsound basement_water
+		while (self.ff_firing) {
+			if (level.time - self.ff_firetime > 0.25) {
+				self.ff_firetime = level.time
+				local.waterent = spawn script_model model "models/emitters/waterfall.tik" origin (self gettagposition "tag_weapon_left") targetname "ff_waterent"
+				local.waterent.ff_player = self
+				local.waterent.ff_timestamp = level.time
+				local.waterent physics_on
+				local.waterent notsolid
+				local.ang = float(self.viewangles[0])
+				if (local.ang < 0)
+					local.ang = local.ang * -0.8
+				local.mult = 1.0 - local.ang / 90.0
+				if (local.mult < 0.25)
+					local.mult = 0.25
+				local.waterent.velocity = (angles_toforward self.viewangles) * 1250 * local.mult
+			}
+			waitframe
+		}
+		self stoploopsound
+		self playsound snd_step_wade
+	} else if (local.arg == "burnkill") {
+		level.ff_burnkills[self.dmteam]++
+		//waitthread global/firefighters/main.scr::update_score
+		//waitexec global/firefighters/hud.scr
+	}
+end

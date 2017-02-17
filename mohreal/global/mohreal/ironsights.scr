@@ -1,0 +1,32 @@
+main local.arg:
+	if (local.arg == "toggle") {
+		local.str = getcvar("g_mohr_zoomers")
+		goto toggle
+	}
+	if (local.arg == "on") {
+		local.str = getcvar("g_mohr_zoomers")
+		goto on
+	}
+	if (local.arg == "off") {
+		local.str = getcvar("g_mohr_zoomers")
+		goto off
+	}
+	println "mohrs: invalid ironsight.scr argument: " local.arg
+	end
+
+toggle:
+	if (local.str[self.entnum] == "1")
+		local.str[self.entnum] = "0"
+	else
+		local.str[self.entnum] = "1"
+	goto set
+on:
+	local.str[self.entnum] = "1"
+	goto set
+off:
+	local.str[self.entnum] = "0"
+	goto set
+set:
+	thread global/mohreal/weapons.scr::main "acc" local.str[self.entnum]
+	setcvar "g_mohr_zoomers" local.str
+end

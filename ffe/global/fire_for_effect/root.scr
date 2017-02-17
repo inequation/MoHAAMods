@@ -1,0 +1,837 @@
+// Fire-For-Effect! Modification
+// Written by Rookie One
+// Artillery support partially based on Bjarne Grönnevik's Rjukan Project scout mod (credits below)
+
+// Scout modification
+// ARCHITECTURE: Bjarne Grönnevik
+// SCRIPTING: Bjarne Grönnevik
+// LINK: http://www.planetmedalofhonor.com/rjukanproject/
+// VERSION: 1.3
+
+main:
+	if (level.ffe_running == 1) // allow only one instance of the script
+		end
+	else
+		level.ffe_running = 1
+	
+	level.ffe_version = "0.9.3"
+	level.ffe_version_date = "22.05.2005"
+
+	println "[FIRE-FOR-EFFECT]: Initializing Fire-For-Effect! script (version " level.ffe_version " [" level.ffe_version_date "])..."
+	thread player_watcher
+	
+	level.the_gametype = int(getcvar(g_gametype))
+	
+	level.ffe_settings = waitexec ffe_settings.txt
+	level.ffe_localization = waitthread ffe_settings.txt::localize
+	level.ffe_airstrike = waitexec global/fire_for_effect/smokeys.scr
+	
+	if (level.ffe_settings["artillery"] != 1 && level.ffe_airstrike != 1)
+	{
+		println "[FIRE-FOR-EFFECT]: Both airstrikes and artillery disabled. Terminating."
+		end
+	}
+	
+	local.presetname = ("global/fire_for_effect/map_presets/" + (waitthread lowercase (getcvar(mapname))) + ".scr")
+	println ("[FIRE-FOR-EFFECT]: Attempting to load preset "  + local.presetname + "...")
+	local.preset = waitexec local.presetname
+	if (local.preset != 1)
+	{
+		println ("[FIRE-FOR-EFFECT]: WARNING!!! Loading map preset "  + getcvar(mapname) + " failed! Falling back to skybox tracing method!")
+		level.ffe_method = "skybox"
+	}
+	else
+		println ("[FIRE-FOR-EFFECT]: Loading map preset "  + local.presetname + " succeeded.")
+	if ((level.ffe_method == "zones" || level.ffe_method == "xzones") && level.ffe_zones.size < 1)
+	{
+		println "[FIRE-FOR-EFFECT]: WARNING!!! " level.ffe_method " method selected but no zones specified! Falling back to skybox tracing!"
+		level.ffe_method = "skybox"
+	}
+	println "[FIRE-FOR-EFFECT]: " level.ffe_method " tracing method selected."
+	
+	if (!(level.ffe_settings["artillery_number"] > 0))
+		level.ffe_settings["artillery_number"] = 4
+	if (!(level.ffe_settings["artillery_radius"] > 0))
+		level.ffe_settings["artillery_radius"] = 400
+	if (!(level.ffe_settings["artillery_damage"] > 0))
+		level.ffe_settings["artillery_damage"] = 400
+	if (!(level.ffe_settings["artillery_spread"] > 0))
+		level.ffe_settings["artillery_spread"] = 250
+	if (!(level.ffe_settings["artillery_delayfixed"] > 0))
+		level.ffe_settings["artillery_delayfixed"] = 2.2
+	if (!(level.ffe_settings["artillery_delayrandom"] > 0))
+		level.ffe_settings["artillery_delayrandom"] = 1.6
+	if (!(level.ffe_settings["spotter_damage"] > 0))
+		level.ffe_settings["spotter_damage"] = 90
+	if (!(level.ffe_settings["spotter_radius"] > 0))
+		level.ffe_settings["spotter_radius"] = 50
+	if (!(level.ffe_settings["spotter_spread"] > 0))
+		level.ffe_settings["spotter_spread"] = 50
+	if (!(level.ffe_settings["airstrike_number"] > 0))
+		level.ffe_settings["airstrike_number"] = 10
+	if (!(level.ffe_settings["airstrike_radius"] > 0))
+		level.ffe_settings["airstrike_radius"] = 400
+	if (!(level.ffe_settings["airstrike_damage"] > 0))
+		level.ffe_settings["airstrike_damage"] = 400
+	if (!(level.ffe_settings["airstrike_step"] > 0))
+		level.ffe_settings["airstrike_step"] = 150
+	if (!(level.ffe_settings["airstrike_delay"] > 0))
+		level.ffe_settings["airstrike_delay"] = 0.1
+	if (!(level.ffe_settings["airstrike_spread"] > 0))
+		level.ffe_settings["airstrike_spread"] = 64
+	
+	level waittill prespawn
+	
+	local.master = spawn ScriptMaster
+	local.master aliascache steamloop sound/mechanics/Mec_SteamLoop_01.wav soundparms 1.0 0.3 1.0 0.0 320 2200 item loaded maps "m dm obj"
+	local.master alias airstrike_invalid_target1 sound/dialogue/M3L2/A/dfr_m3l3_344k.wav soundparms 1.0 0.0 1.0 0.0 80 112 dialog streamed subtitle "That's not a target. Over." maps "m dm obj"
+	local.master alias airstrike_invalid_target2 sound/dialogue/M3L3/A/dfr_m3l3_345o.wav soundparms 1.0 0.0 1.0 0.0 80 112 dialog streamed subtitle "Give me a target. Over." maps "m dm obj"
+	local.master alias airstrike_valid_target1 sound/dialogue/M3L2/A/dfr_m3l3_346k.wav soundparms 1.0 0.0 1.0 0.0 80 112 dialog streamed subtitle "Roger. Target acquired." maps "m dm obj"
+	local.master alias airstrike_valid_target2 sound/dialogue/M3L3/A/dfr_m3l3_347o.wav soundparms 1.0 0.0 1.0 0.0 80 112 dialog streamed subtitle "Roger. Consider it done." maps "m dm obj"
+	local.master alias airstrike_already_enroute1 sound/dialogue/M3L2/A/dfr_m3l3_348k.wav soundparms 1.0 0.0 1.0 0.0 80 112 dialog streamed subtitle "Target already acquired. Over." maps "m dm obj"
+	local.master alias airstrike_already_enroute2 sound/dialogue/M3L3/A/dfr_m3l3_349o.wav soundparms 1.0 0.0 1.0 0.0 80 112 dialog streamed subtitle "Already enroute to a target. Over." maps "m dm obj"
+	local.master aliascache arty_leadinmp1 sound/weapons/explo/Exp_LeadIn_06.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp2 sound/weapons/explo/Exp_LeadIn_07.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp3 sound/weapons/explo/Exp_LeadIn_08.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp4 sound/weapons/explo/Exp_LeadIn_09.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp5 sound/weapons/explo/Exp_LeadIn_10.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp6 sound/weapons/explo/Exp_LeadIn_11.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp7 sound/weapons/explo/Exp_LeadIn_12.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+	local.master aliascache arty_leadinmp8 sound/weapons/explo/Exp_LeadIn_13.wav soundparms 0.8 0.2 0.7 0.5 160 3000 auto loaded maps "m dm obj"
+
+	println "[FIRE-FOR-EFFECT]: Caching models..."
+	cache models/animate/fx_mortar_dirt.tik
+	cache models/emitters/linger_smoke.tik
+	cache models/items/binoculars.tik
+	
+	level waittill spawn
+	
+	println ("[FIRE-FOR-EFFECT]: Instruction frequency: " + level.ffe_settings["instruction_frequency"])
+
+	if ($world.farplane == NIL )
+		level.ffe_sight_max = 22000
+	else
+	{
+		if ($world.farplane < 1)
+			level.ffe_sight_max = 22000
+		else
+			level.ffe_sight_max = $world.farplane
+	}
+	println ("[FIRE-FOR-EFFECT]: Farplane is " + $world.farplane + ", maximum artillery support calling range is " + level.ffe_sight_max + ".")
+	
+	if (level.the_gametype == 1)
+		thread firemission_timer freeforall
+	else
+	{
+		thread firemission_timer allies
+		thread firemission_timer axis
+	}
+	if (level.ffe_airstrike == 1)
+		thread smokegrenade_handler
+	thread print_instructions level.ffe_settings["instruction_frequency"]
+end
+
+print_instructions local.inst_freq:
+	wait (local.inst_freq / 2)
+	huddraw_align 102 left bottom
+	huddraw_color 102 0.0 0.25 1.0
+	huddraw_font 102 handle-22
+	huddraw_alpha 102 0.0
+	local.text = ("Fire For Effect! v" + level.ffe_version + " modification by Rookie One\nhttp://www.moh.gamesnet.pl/rookieone")
+	huddraw_rect 102 16 -185 0 0
+	huddraw_string 102 local.text
+	if (level.ffe_settings["artillery"] == 1 || level.ffe_airstrike == 1)
+	{
+		if (level.ffe_settings["artillery"] == 1)
+			local.text = level.ffe_localization["Use your binoculars to call artillery support (aim somewhere and click fire)."]
+		if (level.ffe_airstrike == 1)
+			local.text = local.text + "\n" + level.ffe_localization["Use smoke grenades (Stielhandgranaten) to call airstrikes."]
+		local.text = local.text + "\n" + level.ffe_localization["One fire mission can be called each "] + level.ffe_settings["powertimer"]+ level.ffe_localization[" seconds."]
+		huddraw_rect 103 16 -135 0 0
+		huddraw_align 103 left bottom
+		huddraw_alpha 103 0.0
+		huddraw_color 103 0.75 0.75 0.75
+		huddraw_font 103 facfont-20
+		huddraw_string 103 local.text
+	}
+	while (1)
+	{
+		
+		for (local.alpha = 0.0; local.alpha <= 1.0; local.alpha += 0.1)
+		{
+			huddraw_alpha 102 local.alpha
+			if (level.ffe_settings["artillery"] == 1 || level.ffe_airstrike == 1)
+				huddraw_alpha 103 local.alpha
+			wait 0.1
+		}
+		wait 8
+		for (local.alpha = 1.0; local.alpha >= 0.0; local.alpha -= 0.1)
+		{
+			huddraw_alpha 102 local.alpha
+			if (level.ffe_settings["artillery"] == 1 || level.ffe_airstrike == 1)
+				huddraw_alpha 103 local.alpha
+			wait 0.1
+		}
+		wait (local.inst_freq - 10)
+	}
+end
+
+binocular_fire:
+	if (level.ffe_settings["artillery"] != 1)
+		end
+	if (self.calling_firemission == 1)
+		end
+	self.calling_firemission = 1
+	if (self.haspower == 1)
+	{
+		if ((self waitthread can_call_fire_mission) == 1)
+		{
+			if (level.the_gametype == 1)
+				local.team = freeforall
+			else
+				local.team = self.dmteam
+			local.hit_location = trace ((self gettagposition "Bip01 Head") + (angles_toforward self.viewangles) * 64) ((self gettagposition "Bip01 Head") + (angles_toforward self.viewangles) * level.ffe_sight_max)
+			local.marker_location = trace (local.hit_location + ( 0 0 16 )) (local.hit_location + ( 0 0 -16384 ))
+			local.checker_location = waitthread trace_surface local.marker_location
+			if (local.checker_location != NIL)
+			{
+				if (local.checker_location != local.marker_location)
+				{
+					if (self != NIL && self != NULL)
+					{
+						self thread play_a_sound airstrike_invalid_target
+						self iprint (level.ffe_localization["ARTILLERY SUPPORT: Cannot see target!"]) 1
+						self.calling_firemission = 0
+					}
+				}
+				else
+				{
+					if (self != NIL && self != NULL)
+					{
+						self take weapons/steilhandgranate.tik
+						self.haspower = 0
+						self.power_timer = 0
+					}
+					level.ffe_firemissiontimer[local.team] += 10
+					local.marker_spot = waitthread get_random_origin local.marker_location 32
+					self thread play_a_sound airstrike_valid_target
+					self iprint (level.ffe_localization["ARTILLERY SUPPORT: Firing for effect!"]) 1
+					self.calling_firemission = 0
+					wait 5
+					local.artillery_marker_boom = spawn models/animate/fx_mortar_dirt.tik scale 0.39 origin local.marker_spot
+					local.artillery_marker_boom notsolid
+					local.artillery_marker_boom thread marker_go_boom self
+					wait 1
+					local.artillery_marker1 = spawn models/emitters/linger_smoke.tik origin local.marker_spot
+					local.artillery_marker1 notsolid
+					local.artillery_marker1 anim start
+					local.artillery_marker2 = spawn models/emitters/linger_smoke.tik origin local.marker_spot
+					local.artillery_marker2 notsolid
+					local.artillery_marker2 anim start
+					wait 5
+					local.artillery_marker1 anim stop
+					local.artillery_marker1 delete
+					local.artillery_marker2 anim stop
+					local.artillery_marker2 delete
+					
+					waitthread artillery_volley local.marker_location self
+				}
+			}
+			else
+			{
+				if (self != NIL && self != NULL)
+				{
+					self thread play_a_sound airstrike_invalid_target
+					self iprint (level.ffe_localization["ARTILLERY SUPPORT: Cannot see target!"]) 1
+					self.calling_firemission = 0
+				}
+			}
+		}
+		else
+		{
+			if (self != NIL && self != NULL)
+			{
+				self thread play_a_sound airstrike_already_enroute
+				local.timeleft = self waitthread get_next_fire_mission
+				self iprint (level.ffe_localization["ARTILLERY SUPPORT: Insufficient fire support! Next fire mission available in "] + local.timeleft + level.ffe_localization[" seconds!"]) 1
+				self.calling_firemission = 0
+			}
+		}
+	}
+	else
+	{
+		if (self != NIL && self != NULL)
+		{
+			local.timeleft = self waitthread get_power_time
+			self iprint (level.ffe_localization["Not enough power to call fire support! Charging will take "] + local.timeleft + level.ffe_localization[" more seconds!"])
+			self.calling_firemission = 0
+		}
+	}
+end
+	
+get_random_origin local.areacentre local.radius:
+	local.randomorigin = local.areacentre
+	local.x = local.areacentre[0]
+	local.y = local.areacentre[1]
+	local.x = local.x + (randomfloat(local.radius * 2) - local.radius)
+	local.y = local.y + (randomfloat(local.radius * 2) - local.radius)
+	local.temporigin = waitthread trace_surface ( local.x local.y local.areacentre[2] )
+	if (local.temporigin == NIL)
+	{
+		local.x = local.x + (randomfloat(local.radius * 2) - local.radius)
+		local.y = local.y + (randomfloat(local.radius * 2) - local.radius)
+		local.temporigin = waitthread trace_surface ( local.x local.y local.areacentre[2] )
+	}
+	if (local.temporigin == NIL)
+	{
+		local.x = local.x + (randomfloat(local.radius * 2) - local.radius)
+		local.y = local.y + (randomfloat(local.radius * 2) - local.radius)
+		local.temporigin = waitthread trace_surface ( local.x local.y local.areacentre[2] )
+	}
+	if (local.temporigin == NIL)
+	{
+		local.temporigin = local.areacentre
+		local.x = local.areacentre[0]
+		local.y = local.areacentre[1]
+	}
+	local.z = local.temporigin[2]
+	local.randomorigin[0] = local.x
+	local.randomorigin[1] = local.y
+	local.randomorigin[2] = local.z
+end local.randomorigin
+
+trace_surface local.location:
+	switch (level.ffe_method)
+	{
+		case "skybox":
+			local.skybox = waitthread trace_skybox_height local.location
+			local.tracedorigin = trace ( local.location[0] local.location[1] (local.skybox - 1) ) ( local.location[0] local.location[1] -16384 )
+			end local.tracedorigin
+		case "zones":
+			for (local.i = 1; local.i <= level.ffe_zones.size; local.i++)
+			{
+				local.zone = level.ffe_zones[local.i]
+				local.inbound = waitthread in_bounds_of local.location local.zone
+				if (local.inbound == 1)
+					end NIL
+			}
+			local.skybox = waitthread trace_skybox_height local.location
+			local.tracedorigin = trace ( local.location[0] local.location[1] (local.skybox - 1) ) ( local.location[0] local.location[1] -16384 )
+			break
+		case "xzones":
+			local.tracedorigin = NIL
+			for (local.i = 1; local.i <= level.ffe_zones.size; local.i++)
+			{
+				local.zone = level.ffe_zones[local.i]
+				local.inbound = waitthread in_bounds_of local.location local.zone
+				if (local.inbound == 1)
+				{
+					local.skybox = waitthread trace_skybox_height local.location
+					end (trace ( local.location[0] local.location[1] (local.skybox - 1) ) ( local.location[0] local.location[1] -16384 ))
+				}
+			}
+			break
+		default:
+			local.tracedorigin = trace ( local.location[0] local.location[1] (local.location[2] + level.ffe_method) ) ( local.location[0] local.location[1] -16384 )
+	}
+end local.tracedorigin
+
+firemission_timer local.team:
+	level.ffe_firemissiontimer[local.team] = 0
+	while (1)
+	{
+		wait 1
+		if (level.ffe_firemissiontimer[local.team] > 0)
+		{
+			level.ffe_firemissiontimer[local.team]--
+		}
+	}
+end
+
+power_timer:
+	self.power_timer = level.ffe_settings["powertimer"] - level.ffe_settings["powertimerdelay"]
+	self.haspower = 0
+	while (isAlive(self) && self.dmteam != spectator)
+	{
+		if (self.haspower == 0)
+		{
+			if (self.power_timer <= level.ffe_settings["powertimer"])
+				self.power_timer++
+			if (self.power_timer == level.ffe_settings["powertimer"])
+			{
+				if (level.ffe_airstrike == 1)
+					self item weapons/steilhandgranate.tik
+				self.haspower = 1
+				self.power_timer = 0
+				self iprint (level.ffe_localization["Charging complete!"])
+			}
+		}
+		wait 1
+	}
+end
+
+go_boom local.caller:
+	self playsound arty_leadinmp
+	wait 1
+	self stopsound
+	self anim start
+	waitthread scored_radiusdamage self.origin local.caller level.ffe_settings["artillery_damage"] level.ffe_settings["artillery_radius"]
+	if (level.ffe_settings["earthquakes"] == 1)
+		thread boom_earthquake
+	wait 1
+	self delete
+end
+
+marker_go_boom local.caller:
+	self playsound arty_leadinmp
+	wait 1
+	self stopsound
+	self anim start
+	waitthread scored_radiusdamage self.origin local.caller level.ffe_settings["spotter_damage"] level.ffe_settings["spotter_radius"]
+	if (level.ffe_settings["earthquakes"] == 1)
+		thread boom_earthquake 1
+	wait 1
+	self delete
+end
+
+artillery_volley local.location local.caller:
+	for (local.i = 1; local.i <= level.ffe_settings["artillery_number"]; local.i++)
+		local.explosionorigins[local.i] = waitthread get_random_origin local.location level.ffe_settings["artillery_spread"]
+	for (local.i = 1; local.i <= level.ffe_settings["artillery_number"]; local.i++)
+	{
+		local.explosions[local.i] = spawn models/animate/fx_mortar_dirt.tik scale 1.0 origin local.explosionorigins[local.i]
+		local.explosions[local.i] thread go_boom local.caller
+		wait (level.ffe_settings["artillery_delayfixed"] + randomfloat(level.ffe_settings["artillery_delayrandom"]))
+	}
+end
+
+trace_skybox_height local.location:
+	local.newloc = trace ( local.location[0] local.location[1] 16384 ) ( local.location[0] local.location[1] -16384 )
+end local.newloc[2]
+
+player_watcher:
+	level waittill spawn
+	println "[FIRE-FOR-EFFECT]: Starting the player watcher"
+	while (1)
+	{
+		for (local.i = 1; local.i <= $player.size; local.i++)
+		{
+			if (isAlive($player[local.i]) && $player[local.i].dmteam != spectator && $player[local.i].done != 1)
+			{
+				$player[local.i].done = 1
+				$player[local.i] thread equip_at_join
+			}
+		}
+		waitframe
+	}
+end
+
+equip_at_join:
+	local.trg = spawn trigger_multiple origin self.origin
+	local.trg glue self
+	local.trg.player = self
+	local.trg setthread global/fire_for_effect/root.scr::player_join_trigger
+	while (self != NIL && self != NULL && local.trg != NIL && local.trg != NULL)
+		waitframe
+	if (local.trg != NIL && local.trg != NULL)
+		local.trg delete
+end
+
+player_join_trigger:
+	if (parm.other == self.player)
+	{
+		self.player item items/binoculars.tik
+		if (level.ffe_airstrike == 1)
+		{
+			if (self.player.dmteam == axis)
+			{
+				self.player take weapons/steilhandgranate.tik
+				self.player item weapons/m2frag_grenade.tik
+			}
+		}
+		self.player thread reset_at_death
+		if (level.ffe_settings["artillery"] == 1 || level.ffe_airstrike == 1)
+			self.player thread power_timer
+		self delete
+	}
+end
+
+reset_at_death:
+	if (self.dmteam != spectator)
+	{
+		local.team = self.dmteam
+		while (isAlive(self) && self.dmteam == local.team)
+			waitframe
+	}
+	self.done = 0
+	self.haspower = 0
+end
+
+scored_radiusdamage local.org local.attacker local.dmg local.radius:
+	if (local.attacker == NIL || local.attacker == NULL)
+		local.attacker = $world
+	local.ent = waitthread spawn_nobroadcast script_origin (local.org + ( 0 0 8 ))
+	for (local.i = 1; local.i <= $player.size; local.i++)
+	{
+		if (isAlive($player[local.i]) && $player[local.i].dmteam != spectator)
+		{
+			if (vector_within local.ent.origin $player[local.i].origin (local.radius + 1))
+			{
+				if (local.ent cansee $player[local.i] 360 local.radius)
+				{
+					local.actualdamage = int(local.dmg - (float(local.dmg) / float(local.radius) * (vector_length ($player[local.i].origin - local.ent.origin))))
+					//               damage (attacker,     damage,            inflictor,     position, direction,                                                                     normal,   knockback,    damageflags, meansofdeath, location)
+					$player[local.i] damage local.attacker local.actualdamage local.attacker ( 0 0 0 ) ((angles_toforward(angles_pointat local.ent local.ent $player[local.i])) * -1) ( 0 0 0 ) (local.actualdamage * 1.5) 0 9 -1
+				}
+			}
+		}
+	}
+	if (level.jvbot_jv_mp_ai_running == 1 && level.botlastid != NIL) // jv_bot support
+	{
+		for (local.i = 1; local.i <= level.botlastid; local.i++)
+		{
+			if (isAlive(level.actualbots[local.i]))
+			{
+				if (vector_within local.ent.origin level.actualbots[local.i].origin (local.radius + 1))
+				{
+					if (local.ent cansee level.actualbots[local.i] 360 local.radius)
+					{
+						local.actualdamage = int(local.dmg - (float(local.dmg) / float(local.radius) * (vector_length (level.actualbots[local.i].origin - local.ent.origin))))
+						level.actualbots[local.i] damage local.attacker local.actualdamage local.attacker ( 0 0 0 ) ((angles_toforward(angles_pointat local.ent local.ent level.actualbots[local.i])) * -1) ( 0 0 0 ) (local.actualdamage * 1.5) 0 9 -1
+					}
+				}
+			}
+		}
+	}
+	if (level.ffe_damageable != NIL && level.ffe_damageable != NULL)
+	{
+		for (local.i = 0; local.i <= level.ffe_damageable.size; local.i++)
+		{
+			if (isAlive(level.ffe_damageable[local.i]))
+			{
+				if (vector_within local.ent.origin level.ffe_damageable[local.i].origin (local.radius + 1))
+				{
+					if (local.ent cansee level.ffe_damageable[local.i] 360 local.radius)
+					{
+						local.actualdamage = int(local.dmg - (float(local.dmg) / float(local.radius) * (vector_length (level.ffe_damageable[local.i].origin - local.ent.origin))))
+						level.ffe_damageable[local.i] damage local.attacker local.actualdamage local.attacker ( 0 0 0 ) ((angles_toforward(angles_pointat local.ent local.ent level.ffe_damageable[local.i])) * -1) ( 0 0 0 ) (local.actualdamage * 1.5) 0 9 -1
+					}
+				}
+			}
+		}
+	}
+	//radiusdamage local.ent.origin local.dmg local.radius
+	local.ent delete
+end
+
+smokegrenade_handler:
+	local.trg = spawn trigger_multipleall spawnflags 20 origin ( 0 0 0 )
+	local.trg setsize ( -16384 -16384 -16384 ) ( 16384 16384 16384 )
+	local.trg setthread smokegrenade_trigger_fire
+end
+
+smokegrenade_trigger_fire:
+	local.projectile = parm.other
+	local.player = parm.owner
+	if (local.projectile.done == 1)
+		end
+	local.projectile.done = 1
+	waitframe
+	if (local.projectile.model == models/projectiles/steilhandgranate.tik || local.projectile.model == models/projectiles/steilhandgranate_primary.tik)
+	{
+		local.player.haspower = 0
+		local.player.power_timer = 0
+		local.projectile thread smokegrenade_fire local.player
+		local.projectile thread make_smoke
+		local.projectile nodamage
+	}
+end
+
+smokegrenade_fire local.caller:
+	if (local.caller.calling_firemission == 1)
+		end
+	local.caller.calling_firemission = 1
+	local.caller take weapons/steilhandgranate.tik
+	local.caller uselast
+	wait 3.5
+	local.ent = spawn script_origin origin self.origin
+	local.ent playsound airplane
+	local.ent thread remove_after 10
+	wait 1.5
+	if ((local.caller waitthread can_call_fire_mission) == 1)
+	{
+		if (level.the_gametype == 1)
+			local.team = freeforall
+		else
+			local.team = local.caller.dmteam
+		level.ffe_firemissiontimer[local.team] += 10
+		local.marker_location = trace (self.origin + ( 0 0 8 )) (self.origin + ( 0 0 -16384 ))
+		local.checker_location = waitthread trace_surface local.marker_location
+		if (local.checker_location != NIL)
+		{
+			if (local.checker_location != local.marker_location)
+			{
+				if (local.caller != NIL && local.caller != NULL)
+				{
+					local.caller thread play_a_sound airstrike_invalid_target
+					local.caller iprint (level.ffe_localization["AIR SUPPORT: Aborting, cannot see target!"]) 1
+					local.caller.calling_firemission = 0
+				}
+				wait 1
+				self explode
+			}
+			else
+			{
+				if (local.caller != NIL && local.caller != NULL)
+				{
+					local.caller thread play_a_sound airstrike_valid_target
+					local.caller iprint (level.ffe_localization["AIR SUPPORT: Affirmative! On my way!"]) 1
+					local.caller.calling_firemission = 0
+				}
+					self explosionmodel models/fx/dummy.tik
+				
+				wait 1
+				self stoploopsound
+				self delete
+				waitthread airstrike_volley local.marker_location local.caller
+			}
+		}
+		else
+		{
+			if (local.caller != NIL && local.caller != NULL)
+			{
+				local.caller thread play_a_sound airstrike_invalid_target
+				local.caller iprint (level.ffe_localization["AIR SUPPORT: Aborting, cannot see target!"]) 1
+				local.caller.calling_firemission = 0
+			}
+			wait 1
+			self explode
+		}
+	}
+	else
+	{
+		if (local.caller != NIL && local.caller != NULL)
+		{
+			local.caller thread play_a_sound airstrike_already_enroute
+			local.timeleft = local.caller waitthread get_next_fire_mission
+			local.caller iprint (level.ffe_localization["AIR SUPPORT: Too many airstrikes requested! Next fire mission available in "] + local.timeleft + level.ffe_localization[" seconds!"]) 1
+			local.caller.calling_firemission = 0
+		}
+		wait 1
+		self explode
+	}
+end
+
+make_smoke:
+	local.smoke1 = spawn models/emitters/linger_smoke.tik origin self.origin
+	local.smoke2 = spawn models/emitters/linger_smoke.tik origin self.origin
+	local.smoke1 glue self
+	local.smoke2 glue self
+	local.smoke1 anim start
+	local.smoke2 anim start
+	self loopsound steamloop
+	while (isAlive(self))
+		waitframe
+	local.smoke1 delete
+	local.smoke2 delete
+end
+
+in_bounds_of local.location local.zone:
+	local.result = 0
+	if (local.zone[1][0] < local.zone[2][0])
+	{
+		local.temp = local.zone[1][0]
+		local.zone[1][0] = local.zone[2][0]
+		local.zone[2][0] = local.temp
+	}
+	if (local.zone[1][1] < local.zone[2][1])
+	{
+		local.temp = local.zone[1][1]
+		local.zone[1][1] = local.zone[2][1]
+		local.zone[2][1] = local.temp
+	}
+	if (local.location[0] <= local.zone[1][0] && local.location[0] >= local.zone[2][0])
+	{
+		if (local.location[1] <= local.zone[1][1] && local.location[1] >= local.zone[2][1])
+			local.result = 1
+	}
+end local.result
+
+airstrike_volley local.location local.caller:
+	local.fwd_vec = angles_toforward ( 0 (randomint(4) * 90) 0 )
+	local.offset = ((level.ffe_settings["airstrike_step"] * level.ffe_settings["airstrike_number"]) / 2 - level.ffe_settings["airstrike_step"] / 2) * -1
+	for (local.i = 1; local.i <= level.ffe_settings["airstrike_number"]; local.i++)
+	{
+		local.explosionorigins[local.i] = waitthread get_random_origin (local.location + local.fwd_vec * local.offset) level.ffe_settings["airstrike_spread"]
+		local.offset += level.ffe_settings["airstrike_step"]
+	}
+	for (local.i = 1; local.i <= level.ffe_settings["airstrike_number"]; local.i++)
+	{
+		if (local.explosionorigins[local.i] != NIL)
+		{
+			local.explosions[local.i] = spawn models/animate/fx_mortar_dirt.tik scale 0.75 origin local.explosionorigins[local.i]
+			local.explosions[local.i] thread airstrike_go_boom local.caller
+		}
+		wait level.ffe_settings["airstrike_delay"]
+	}
+end
+
+airstrike_go_boom local.caller:
+	self anim start
+	waitthread scored_radiusdamage self.origin local.caller level.ffe_settings["airstrike_damage"] level.ffe_settings["airstrike_radius"]
+	if (level.ffe_settings["earthquakes"] == 1)
+		thread boom_earthquake 1
+	wait 1
+	self delete
+end
+
+play_a_sound local.sound:
+	self playsound local.sound
+	/*if (self.radioent == NIL || self.radioent == NULL)
+	{
+		self.radioent = spawn script_model model models/fx/dummy.tik origin (self gettagposition "eyes bone")
+		self.radioent notsolid
+		self.radioent rendereffects "+dontdraw"		
+		self.radioent attach self "eyes bone"
+	}
+	self.radioent playsound local.sound*/
+end
+
+can_call_fire_mission:
+//	local.result = 0
+	if (level.the_gametype == 1)
+		local.team = freeforall
+	else
+		local.team = self.dmteam
+	if (local.team == spectator)
+		end 0
+	if ((level.ffe_firemissiontimer[local.team] + 10) <= (level.ffe_settings["firemissions"] * 10))
+		end 1
+	end 0
+end
+
+get_next_fire_mission:
+	if (level.the_gametype == 1)
+		local.team = freeforall
+	else
+		local.team = self.dmteam
+	end (level.ffe_settings["firemissions"] * 10 - level.ffe_firemissiontimer[local.team])
+end
+
+get_power_time:
+	local.result = level.ffe_settings["powertimer"] - self.power_timer
+end local.result
+
+remove_after local.time:
+	wait local.time
+	self delete
+end
+
+spawn_nobroadcast local.entityclassname local.origin:
+	local.ent = spawn local.entityclassname origin local.origin
+	local.ent svflags "-broadcast"
+end local.ent
+
+lowercase local.text:
+	for (local.i = 0; local.i < local.text.size; local.i++)
+	{
+		switch (local.text[local.i])
+		{
+			case "A":
+				local.text[local.i] = "a"
+				break
+			case "B":
+				local.text[local.i] = "b"
+				break
+			case "C":
+				local.text[local.i] = "c"
+				break
+			case "D":
+				local.text[local.i] = "d"
+				break
+			case "E":
+				local.text[local.i] = "e"
+				break
+			case "F":
+				local.text[local.i] = "f"
+				break
+			case "G":
+				local.text[local.i] = "g"
+				break
+			case "H":
+				local.text[local.i] = "h"
+				break
+			case "I":
+				local.text[local.i] = "i"
+				break
+			case "J":
+				local.text[local.i] = "j"
+				break
+			case "K":
+				local.text[local.i] = "k"
+				break
+			case "L":
+				local.text[local.i] = "l"
+				break
+			case "M":
+				local.text[local.i] = "m"
+				break
+			case "N":
+				local.text[local.i] = "n"
+				break
+			case "O":
+				local.text[local.i] = "o"
+				break
+			case "P":
+				local.text[local.i] = "p"
+				break
+			case "Q":
+				local.text[local.i] = "q"
+				break
+			case "R":
+				local.text[local.i] = "r"
+				break
+			case "S":
+				local.text[local.i] = "s"
+				break
+			case "T":
+				local.text[local.i] = "t"
+				break
+			case "U":
+				local.text[local.i] = "u"
+				break
+			case "V":
+				local.text[local.i] = "v"
+				break
+			case "W":
+				local.text[local.i] = "w"
+				break
+			case "X":
+				local.text[local.i] = "x"
+				break
+			case "Y":
+				local.text[local.i] = "y"
+				break
+			case "Z":
+				local.text[local.i] = "z"
+				break
+		}
+	}
+end local.text
+
+boom_earthquake local.type:
+	if (local.type == 1)
+	{
+		earthquake .175 5 0 0
+		earthquake .115 3 0 0
+		earthquake .15 .5 0 0
+		earthquake .15 .625 0 1
+	}
+	else
+	{
+		earthquake .2 9 0 0
+		earthquake .16 5 0 0
+		earthquake .45 .8 0 0
+		earthquake .32 .3 0 1
+	}
+end

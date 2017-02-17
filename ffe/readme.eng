@@ -1,0 +1,86 @@
+File            : Fire-For-Effect!
+Author          : Rookie One
+Version         : 0.8
+Release Date    : 02.04.2005
+
+Description     :
+This mod adds Wolfenstein: Enemy Territory-style fire support to MoHAA! :) Just aim somewhere with your binoculars and click fire or throw a smoke grenade (Steilhandgranate)... and find some good cover! :P
+
+***WARNING***
+This modification uses a custom DMprecache.scr script and a custom torso state file. If you're using any other modification that does so too (for instance DMz DogTag, Snake's Server Patch or AntiCamper {sfx}), you will need to alter these files in order to make them both work at the same time. This is ***ESSENTIAL*** for the mod to work properly.
+
+I put a lot of work and effort to make this modification as 'light-weight' for the server as possible, nevertheless, I cannot guarantee it will not cause a server crash. The default settings are optimal. A test server stood a stress-testing session lasting 48 hours with an average of 16 players fighting without a crash or noticeable performance drop, therefore there is a big chance you will not experience any problems as long as you do not make radical changes to the mod configuration.
+
+One more thing - in response to a few e-mails I received, this modification is intended to work with Medal of Honor Allied Assault ***only***, it ***will not*** work with the Spearhead and Breakthrough expansion packs.
+***WARNING***
+
+You have been warned. I do not take any responsibility for the effects of installing the mod on your server.
+
+From this version there is no need to modify the map scripts unless the map has a non-cubic skybox or it doesn't cover the whole map (e.g. stock Algiers or V2 Rocket Facility) - in these cases you will need a preset script for it. Read the tutorial.txt file to learn how to do it.
+
+The mod settings are read from the ffe_settings.txt file. It is ***ESSENTIAL*** that this file is in the MoHAA/main directory! A Polish version of the file is also included - ffe_settings.pol. Rename it to ffe_settings.txt to have all the messages printed in Polish (well, I guess it's not going to be very useful for you if you're reading this readme :D).
+
+Installation    :
+Just put the .pk3 file AND the configuration file (ffe_settings.txt) into your MoHAA/main directory. You can edit this file to change mod settings.
+
+Version history :
+0.8
+ o fixed a bug that would make the instructions not appear until a map restart (thanks to SuperTank.17 for pointing this out),
+ o fixed a bug in the xzones tracing method that wouldn't let calling fire support anywhere (again thanks to SuperTank.17 for pointing this out),
+ o optimized the zones tracing method to reduce server load,
+ o a custom state file is used now to detect binoculars clicks - the map scripts don't need to be modified anymore,
+ o added a few z's to the name of the .pk3 to make sure FFE replaces Stielhandgranaten as people would often complain that smoke grenades don't,
+ o as the 3-explosion airstrike didn't go very well with ET, you can now choose between a 6-explosion and a 3-explosion airstrike via the configuration file - set it to your liking,
+ o fixed a bug of airstrike explosions appearing at ( 0 0 0 ) if they were supposed to go out of bounds - now they just don't appear at all,
+ o removed the console shutdown feature as it didn't work very well,
+ o code reorganisation.
+
+0.7
+ o reduced the explosion knockback multiplier as bodies were flying everywhere around the map, :P
+ o fixed a preset loading routine bug that would cause the mapname to be read as "getcvar",
+ o there are now 3 explosions in an airstrike instead of 6, but they are HUGE, :) which conpensates well for the small number; matches WolfET better; also improves performance,
+ o artillery marker won't kill you now - it deals a random damage from 15 to 25; matches WolfET better,
+ o improved damage dealing routine for better performance.
+
+0.6
+ o unused code removed,
+ o improved player handling - the previous version, in extreme conditions, could crash the server at times if lots of players left their teams while spectating or dead,
+ o map preset is now case insensitive, so it will work if the mapname cvar is not lower case,
+ o pain indicator now works fine when killed by an explosion,
+
+0.5
+ o fixed a power timer bug that allowed instant power after calling an airstrike,
+ o gave up on trying to simulate a weaker grenade explosion... :(
+
+0.4
+A long list of bugfixes and changes this time:
+ o a distance check is performed before sighttracing from an explosion to player to save server system resources,
+ o fixed the unlimited number of airstrikes bug,
+ o most of the script_origins are now not broadcasted to the clients to save bandwidth,
+ o fire effect removed from the explosions, as they caused huge FPS drops and lag,
+ o reduced the number of smoke entities spawned - they'd had eaten bandwidth,
+ o you can now shut the script down using the ffe_shutdown cvar,
+ o Axis players won't be left with 1 grenade against Allies' 6 (or 3, if realism is installed) on non-FFE-enabled maps,
+ o fixed a bug that printed NIL to player when he threw a smoke grenade and went spectating immediately,
+ o changed the "insufficent fire support" message for air support to "too many airstrikes requested",
+ o improved handling of the grenade projectiles,
+ o a new, neat instructions message. :)
+
+0.3
+Lots of changes, I don't remember most of them. :P What I do remember: fixed the zones and xzones methods bugs, enlarged the distance between airstrike explosions.
+
+0.2
+Added airstrike calling by smoke grenades (thanks to Elgan for the suggestion to use parm.owner!), changed fire mission timer system.
+
+0.1
+First version.
+
+Contact         :
+Email           : rookie_one@army.com
+ICQ/AIM         : 146098049
+MSN/Windows Msg : rookie_one@army.com
+Jabber          : r00kie_0ne@chrome.pl
+
+--------------------------------------------------------------------
+
+This mod may not be edited without my permission. 

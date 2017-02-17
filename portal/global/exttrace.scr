@@ -1,0 +1,136 @@
+// exttrace fgame hook helper script
+// written by Leszek Godlewski
+// execute to gain access to easy surface and content flag definitions
+
+main:
+	// define the content and surface flags
+	// these are based upon my research conducted for the OpenMoHAA project and can occasionaly be wrong or unknown
+	
+	level.CONTENTS_SOLID = 1
+	level.CONTENTS_UNKNOWN1 = 2
+	level.CONTENTS_UNKNOWN2 = 4
+	level.CONTENTS_LAVA = 8
+	level.CONTENTS_SLIME = 16
+	level.CONTENTS_WATER = 32
+	level.CONTENTS_FOG = 64
+	level.CONTENTS_NOTTEAM1 = 128
+	level.CONTENTS_NOTTEAM2 = 256
+	level.CONTENTS_NOBOTCLIP = 512
+	level.CONTENTS_UNKNOWN3 = 1024
+	level.CONTENTS_UNKNOWN4 = 2048
+	level.CONTENTS_UNKNOWN5 = 4096
+	level.CONTENTS_FENCE = 8192
+	level.CONTENTS_UNKNOWN4 = 16384
+	level.CONTENTS_AREAPORTAL = 32768
+	level.CONTENTS_PLAYERCLIP = 65536
+	level.CONTENTS_MONSTERCLIP = 131072
+	level.CONTENTS_WEAPONCLIP = 262144
+	level.CONTENTS_VEHICLECLIP = 524288
+	level.CONTENTS_SHOOTONLY = 1048576
+	level.CONTENTS_DONOTENTER = 2097152
+	level.CONTENTS_BOTCLIP = 4194304
+	level.CONTENTS_MOVER = 8388608
+	level.CONTENTS_ORIGIN = 16777216
+	level.CONTENTS_BODY = 33554432
+	level.CONTENTS_CORPSE = 67108864
+	level.CONTENTS_DETAIL = 134217728
+	level.CONTENTS_STRUCTURAL = 268435456
+	level.CONTENTS_TRANSLUCENT = 536870912
+	level.CONTENTS_TRIGGER = 1073741824
+	level.CONTENTS_NODROP = 2147483648
+
+	level.SURF_NODAMAGE = 1
+	level.SURF_SLICK = 2
+	level.SURF_SKY = 4
+	level.SURF_LADDER = 8
+	level.SURF_NOIMPACT = 16
+	level.SURF_NOMARKS = 32
+	level.SURF_CASTSHADOW = 64
+	level.SURF_NODRAW = 128
+	level.SURF_NOLIGHTMAP = 256
+	level.SURF_ALPHASHADOW = 512
+	level.SURF_NOSTEPS = 1024
+	level.SURF_NONSOLID = 2048
+	level.SURF_UNKNOWN1 = 4096
+	level.SURF_PAPER = 8192
+	level.SURF_WOOD = 16384
+	level.SURF_METAL = 32768
+	level.SURF_ROCK = 65536
+	level.SURF_DIRT = 131072
+	level.SURF_GRILL = 262144
+	level.SURF_GRASS = 524288
+	level.SURF_MUD = 1048576
+	level.SURF_PUDDLE = 2097152
+	level.SURF_GLASS = 4194304
+	level.SURF_GRAVEL = 8388608
+	level.SURF_SAND = 16777216
+	level.SURF_FOLIAGE = 33554432
+	level.SURF_SNOW = 67108864
+	level.SURF_CARPET = 134217728
+	level.SURF_UNKNOWN2 = 268435456
+	level.SURF_NODLIGHT = 536870912
+	level.SURF_HINT = 1073741824
+	level.SURF_UNKNOWN3 = 2147483648
+end
+
+// decomposes the given integer and returns a string describing the content flags included in it
+content_flags_to_string local.x:
+	local.ids = "SOLID"::"UNKNOWN1"::"UNKNOWN2"::"LAVA"::"SLIME"::"WATER"::"FOG"::"NOTTEAM1"::"NOTTEAM2"::"NOBOTCLIP"::"UNKNOWN3"::"UNKNOWN4"::"UNKNOWN5"::"FENCE"::"UNKNOWN4"::"AREAPORTAL"::"PLAYERCLIP"::"MONSTERCLIP"::"WEAPONCLIP"::"VEHICLECLIP"::"SHOOTONLY"::"DONOTENTER"::"BOTCLIP"::"MOVER"::"ORIGIN"::"BODY"::"CORPSE"::"DETAIL"::"STRUCTURAL"::"TRANSLUCENT"::"TRIGGER"::"NODROP"
+	local.str = ""
+	local.bit = 1
+	for (local.i = 1; local.i <= 32; local.i++) {
+		if (local.x & local.bit)
+			local.str = local.str + " " + local.ids[local.i]
+		local.bit = local.bit * 2
+	}
+end local.str
+
+// decomposes the given integer and returns a string describing the surface flags included in it
+surface_flags_to_string local.x:
+	local.ids = "NODAMAGE"::"SLICK"::"SKY"::"LADDER"::"NOIMPACT"::"NOMARKS"::"CASTSHADOW"::"NODRAW"::"NOLIGHTMAP"::"ALPHASHADOW"::"NOSTEPS"::"NONSOLID"::"UNKNOWN1"::"PAPER"::"WOOD"::"METAL"::"ROCK"::"DIRT"::"GRILL"::"GRASS"::"MUD"::"PUDDLE"::"GLASS"::"GRAVEL"::"SAND"::"FOLIAGE"::"SNOW"::"CARPET"::"UNKNOWN2"::"NODLIGHT"::"HINT"::"UNKNOWN3"
+	local.str = ""
+	local.bit = 1
+	for (local.i = 1; local.i <= 32; local.i++) {
+		if (local.x & local.bit)
+			local.str = local.str + " " + local.ids[local.i]
+		local.bit = local.bit * 2
+	}
+end local.str
+
+// utility function to convert a string to a vector (useful for retrieving the normal from xt_plane_normal)
+strtovec local.str:
+	local.vec = ( 0 0 0 )
+	local.index = 0
+	for (local.i = 0; local.i < 3; local.i++) {
+		// skip whitespace
+		while (local.index < local.str.size && local.str[local.index] == " ")
+			local.index++;
+		local.num = 0.0	// temporary value
+		// optional sign
+		local.sign = 1.0
+		if (local.str[local.index] == "-") {
+			local.sign = -1.0
+			local.index++
+		} else if (local.str[local.index] == "+") {
+			// sign is already positive
+			local.index++
+		}
+		// integer part
+		while (local.index < local.str.size && local.str[local.index] != " " && local.str[local.index] != ".") {
+			local.num = local.num * 10.0
+			local.num += int(string(local.str[local.index]))
+			local.index++
+		}
+		// fractional part
+		if (local.index < local.str.size && local.str[local.index] == ".") {
+			local.index++
+			local.mag = 0.1
+			while (local.index < local.str.size && local.str[local.index] != " ") {
+				local.num += int(string(local.str[local.index])) * local.mag
+				local.mag = local.mag * 0.1
+				local.index++
+			}
+		}
+		local.vec[local.i] = local.num * local.sign
+	}
+end local.vec

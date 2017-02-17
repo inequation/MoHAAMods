@@ -1,0 +1,136 @@
+main local.arg1 local.arg2:
+	if (local.arg1 == "fire")
+		goto fire
+	if (local.arg1 == "acc")
+		goto acc
+	if (local.arg1 == "raise")
+		goto raise
+	println "mohrs: invalid weapons.scr argument: " local.arg1
+	end
+
+fire:
+	local.jitter = ( 0 0 0 )
+	local.jitter[0] = -randomfloat(1.5)
+	local.jitter[1] = randomfloat(3.0) - 1.5
+	self.viewangles += local.jitter
+	end
+
+acc:
+	if (!self.mohr_weapon)
+		end
+	if (local.arg2 == "0")
+		self.mohr_ironsights = 0
+	else if (local.arg2 == "1")
+		self.mohr_ironsights = 1
+	else if (local.arg2 == "jump")
+		self.mohr_offground = 1
+	else if (local.arg2 == "fall")
+		self.mohr_offground = 1
+	else if (local.arg2 == "land") {
+		self.mohr_offground = 0
+		self.mohr_shocktime = level.time
+	} else if (local.arg2 == "pain")
+		self.mohr_shocktime = level.time
+	else if (local.arg2 == "run")
+		self.mohr_movement = 4
+	else if (local.arg2 == "walk")
+		self.mohr_movement = 1
+	else if (local.arg2 == "stand")
+		self.mohr_movement = 0
+	else {
+		println "mohrs: invalid weapons.scr::acc argument: " local.arg2
+		end
+	}
+	end
+
+raise:
+	self weaponcommand dual targetname ("weapon" + self.entnum)
+	self.mohr_weapon = $("weapon" + self.entnum)
+	self.mohr_weapon targetname ""
+	// reset accuracy settings so that they are applied to the weapon again
+	self.mohr_spreadfactor = 0
+	self.mohr_multfactor = 0
+	end
+
+// array indices explanation:
+// 1-4 - bulletspread parametres
+// 5-8 - firespreadmult parametres
+// 9 - whether this weapon is affected by ironsights or not
+get_weapon_params local.weap:
+	switch (local.weap) {
+		case "models/weapons/silencedpistol.tik":
+			end 25::25::150::150::0::0::0::0::0
+		case "models/weapons/colt45.tik":
+			end 60::60::130::130::0.58::0.5::200::0.6::0
+		case "models/weapons/m1_garand.tik":
+			end 10::10::70::70::0.75::0.6::200::0.8::1
+		case "models/weapons/springfield.tik":
+			end 59::59::140::140::0::0::0::0::1
+		case "models/weapons/thompsonsmg.tik":
+			end 30::30::45::45::0.3::0.6::150::0.25::1
+		case "models/weapons/bar.tik":
+			end 18::18::52::52::0.35::0.65::160::0.7::1
+		case "models/weapons/shotgun.tik":
+			end 80::80::95::95::0::0::0::0::1
+		case "models/weapons/p38.tik":
+			end 70::70::130::130::0.58::0.5::200::0.6::0
+		case "models/weapons/kar98.tik":
+			end 2::2::55::55::0::0::0::0::1
+		case "models/weapons/kar98sniper.tik":
+			end 59::59::150::150::0::0::0::0::1
+		case "models/weapons/mp40.tik":
+			end 28::28::45::45::0.3::0.6::150::0.25::1
+		case "models/weapons/mp44.tik":
+			end 16::16::53::53::0.475::0.5::200::0.8::1
+		case "models/weapons/bazooka.tik": // ignore projectile weapons and binoculars
+		case "models/weapons/panzerschreck.tik":
+		case "models/weapons/m2frag_grenade.tik":
+		case "models/weapons/steilhandgranate.tik":
+		case "models/items/binoculars.tik":
+			end 0::0::0::0::0::0::0::0::0
+		default:
+			println "mohrs: ERROR: unknown weapon " local.weap
+	}
+end
+
+spreadcontrol:
+	if (!self.mohr_weapon || self.mohr_weapon.classname == "InventoryItem")
+		end
+	local.spreadfactor = 1.0
+	local.multfactor = 1.0
+	local.params = waitthread get_weapon_params self.mohr_weapon.model
+	if (!self.mohr_ironsights && local.params[9]) {
+		local.spreadfactor += 1.0
+		local.multfactor += 0.6
+	}
+	if (self.mohr_offground) {
+		local.spreadfactor += 0.15
+		local.multfactor += 0.25
+	}
+	if (self.mohr_movement) {
+		local.spreadfactor += 0.1 * self.mohr_movement
+		local.multfactor += 0.1 * self.mohr_movement
+	}
+	if (self.mohr_stance) {
+		local.spreadfactor -= 0.1
+		local.multfactor -= 0.05
+	}
+	if (!self.mohr_shocktime)
+		self.mohr_shocktime = -1.0
+	local.elapsed = level.time - self.mohr_shocktime
+	// hyperbolic spread falloff after shock (landing after jumping/falling, pain etc.)
+	if (local.elapsed < 1.0) {
+		local.y = (1.0 / (4.0 * local.elapsed)) - 0.25
+		if (local.y > 1.0)
+			local.y = 1
+		local.spreadfactor += local.y
+		local.multfactor += local.y
+	}
+	//iprintlnbold_noloc "Spreadfactor: " local.spreadfactor " Multfactor: " local.multfactor
+	if (self.mohr_spreadfactor == local.spreadfactor && self.mohr_multfactor == local.multfactor)
+		end	// nothing left for us to do
+	self.mohr_spreadfactor = local.spreadfactor
+	self.mohr_multfactor = local.multfactor
+	self.mohr_weapon dmbulletspread (local.params[1] * local.spreadfactor) (local.params[2] * local.spreadfactor) (local.params[3] * local.spreadfactor) (local.params[4] * local.spreadfactor)
+	self.mohr_weapon dmfirespreadmult (local.params[5] * local.multfactor) (local.params[6] * local.multfactor) (local.params[7] * local.multfactor) (local.params[8] * local.multfactor)
+end

@@ -1,0 +1,227 @@
+// Firefighters modification by IneQuation aka Rookie One
+// This mod may not be used or modified without my explicit permission
+
+main local.arg:
+	if (level.ff_running)
+		end
+	level.ff_running = 1
+
+setcvar "cheats" 1
+setcvar "thereisnomonkey" 1
+
+	
+	if (int(getcvar(ff_off)))
+		end
+	setcvar "g_statefile" "global/firefighters/firefighters"
+
+	println "[FIREFIGHTERS]: Initializing Fire Fighters mod..."
+	
+	local.master = spawn ScriptMaster
+	local.master aliascache basement_water sound/amb/Amb_BasementWater.wav soundparms 1.5 0.0 1.0 0.0 1000 10000 auto loaded maps "dm moh obj train"
+	cache "models/emitters/waterfall.tik"
+	cache "models/animate/fire.tik"
+	
+	if (!int(getcvar(ff_firedamage)))
+		setcvar "ff_firedamage" "5"
+	if (!float(getcvar(ff_firespreadmult)))
+		setcvar "ff_firespreadmult" "1.0"
+	if (!float(getcvar(ff_extinguishmult)))
+		setcvar "ff_extinguishmult" "1.0"
+	
+	level waittill prespawn
+	level waittill spawn
+	
+	level.ff_burnkills[allies] = 0
+	level.ff_burnkills[axis] = 0
+	
+	level.ff_lastframetime = level.time - 0.05
+	
+	local.ff_spread = 1
+	
+	while (1) {
+		level.ff_frametime = level.time - level.ff_lastframetime
+		level.ff_lastframetime = level.time
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if ($player[local.i].ff_ingame && ($player[local.i].dmteam != $player[local.i].ff_team || !isAlive($player[local.i])))
+			{
+				$player[local.i].ff_done = 0
+				$player[local.i].ff_ingame = 0
+				$player[local.i].ff_firing = 0
+			}
+			if (!$player[local.i].ff_done) {
+				$player[local.i].ff_done = 1
+				$player[local.i] thread player_thinker
+			}
+		}
+		if ($ff_waterent) {
+			for (local.i = 1; local.i <= $ff_waterent.size; local.i++) {
+				for (local.j = 1; local.j <= $player.size; local.j++) {
+					if ($ff_waterent[local.i] isTouching $player[local.j])
+						// push them around a bit :)
+						$player[local.j].velocity += ($ff_waterent[local.i].velocity * 0.15)
+				}
+				for (local.j = 1; local.j <= $ff_fireent.size; local.j++) {
+					if ($ff_waterent[local.i] isTouching $ff_fireent[local.j])
+						$ff_waterent[local.i] waitthread fire_extinguish $ff_fireent[local.j]
+				}
+				if (level.time - $ff_waterent[local.i].ff_timestamp > 7.5 || vector_length($ff_waterent[local.i].velocity) < 20)
+					$ff_waterent[local.i] remove
+			}
+		}
+		if ($ff_fireent) {
+			for (local.i = 1; local.i <= $ff_fireent.size; local.i++) {
+				if (local.ff_spread)
+					$ff_fireent[local.i] waitthread fire_spread
+				for (local.j = 1; local.j <= $player.size; local.j++) {
+					if ($player[local.j].ff_ingame && level.time - $player[local.j].ff_paintime > 1) {
+						if ($ff_fireent[local.i] isTouching $player[local.j]) {
+							$player[local.j] damage $world (int(getcvar(ff_firedamage))) $world ( 0 0 0 ) ( 0 0 0 ) ( 0 0 0 ) 0 1 20 -1
+							$player[local.j].ff_paintime = level.time
+						}
+					}
+				}
+			}
+		}
+		if (int(getcvar(arson))) {
+			setcvar "arson" "0"
+			waitthread arson $player.origin
+		}
+		local.ff_spread = !local.ff_spread // this is quite heavy for the server, do this every other frame
+		waitframe
+	}
+end
+
+player_thinker:
+	self.ff_ingame = 0
+	local.trg = spawn trigger_multiple origin self.origin
+	local.trg glue self
+	local.trg.player = self
+	local.trg setthread global/firefighters/main.scr::player_spawned
+	while (self && local.trg)
+		waitframe
+	if (local.trg)
+		local.trg delete
+end
+
+player_spawned:
+	if (parm.other == self.player)
+	{
+		self.player.ff_ingame = 1
+		self.player takeall
+		self.player.ff_team = self.player.dmteam
+		self.player.ff_firetime = level.time - 1.0
+		self.player.ff_paintime = level.time - 1.0
+		waitframe
+		self.player item "models/weapons/shotgun.tik"
+		self.player useweaponclass heavy
+		waitframe
+		self delete
+	}
+end
+
+update_score:
+	level.ff_score[allies] = float(level.ff_extinguishcount[allies]) / float(level.ff_extinguishcount[allies] + level.ff_extinguishcount[axis])
+	level.ff_score[allies] += float(level.ff_burnkills[allies] * -1) + float(level.ff_burnkills[axis])
+	level.ff_score[axis] = float(level.ff_extinguishcount[axis]) / float(level.ff_extinguishcount[allies] + level.ff_extinguishcount[axis])
+	level.ff_score[axis] += float(level.ff_burnkills[axis] * -1) + float(level.ff_burnkills[allies])
+	if (level.ff_score[allies] > level.ff_score[axis]) {
+		waitthread global/firefighters/hud.scr::announce_lead allies
+		level.clockside = allies
+	} else if (level.ff_score[axis] > level.ff_score[allies]) {
+		waitthread global/firefighters/hud.scr::announce_lead axis
+		level.clockside = axis
+	} else {
+		waitthread global/firefighters/hud.scr::announce_lead draw
+		level.clockside = draw
+	}
+end
+
+arson local.org local.dir:
+	local.ent = spawn animate model "models/animate/fire.tik" origin local.org targetname "ff_fireent"
+	local.ent.scale = 0.5
+	local.ent.ff_radius = 20.0
+	local.ent.ff_health = 40.0
+	if (local.dir)
+		local.ent.ff_dir = local.dir
+	else
+		local.ent.ff_dir = ( 0 0 0 )
+	local.ent setsize ( (local.ent.ff_radius * -1.0) (local.ent.ff_radius * -1.0) 0 ) ( local.ent.ff_radius local.ent.ff_radius (local.ent.ff_radius * 2.4) )
+	local.ent notsolid
+	local.ent alwaysdraw
+end
+
+fire_spread:
+	local.newradius = self.ff_radius + (5.0 * level.ff_frametime * float(getcvar(ff_firespreadmult)))
+	self.ff_health += 1.0 * level.ff_frametime * float(getcvar(ff_firespreadmult))
+	local.expand = 1
+	if (self.ff_radius >= 400.0)
+		local.expand = 0
+	// make sure we don't expand if we're already touching another fire ent and we have no expanding direction
+	for (local.i = 1; local.i < $ff_fireent.size; local.i++) {
+		if (abs(int(self.origin[2]) - int($ff_fireent[local.i].origin[2])) < 20.0 && self.ff_dir == ( 0 0 0 )) {
+			if (self isTouching $ff_fireent[local.i]) {
+				local.expand = 0
+				break
+			}
+		}
+	}
+	local.touchindex = 0
+	local.index = 0
+	for (local.i = 0; local.i <= 359; local.i += 2) {
+		local.dest = self.origin + (angles_toforward ( 0 local.i 0 )) * local.newradius
+		local.tr = trace self.origin local.dest 1
+		if (!vector_within local.dest local.tr 2.5) {
+			local.touching[local.touchindex][local.index] = local.tr
+			local.index++
+		} else
+			local.touchindex++
+		local.dest = self.origin + ( 0 0 (self.ff_radius * 1.2) ) + (angles_toforward ( 0 local.i 0 )) * local.newradius
+		local.tr = trace (self.origin + ( 0 0 (self.ff_radius * 1.2) )) local.dest 1
+		if (!vector_within local.dest local.tr 2.5) {
+			local.touching[local.touchindex][local.index] = local.tr
+			local.index++
+		} else
+			local.touchindex++
+		local.dest = self.origin + ( 0 0 (self.ff_radius * 2.4) ) + (angles_toforward ( 0 local.i 0 )) * local.newradius
+		local.tr = trace (self.origin + ( 0 0 (self.ff_radius * 2.4) )) local.dest 1
+		if (!vector_within local.dest local.tr 2.5) {
+			local.touching[local.touchindex][local.index] = local.tr
+			local.index++
+		} else
+			local.touchindex++
+	}
+	/*} else {
+		local.dest = self.origin + (angles_toforward ( 0 (randomint(360)) 0 )) * (self.ff_radius + 32.0)
+		local.tr = trace self.origin local.dest 1
+		waitthread arson local.tr
+	}
+	if (local.touching) {
+		println "No of touching: " local.touching.size
+		for (local.i = 0; local.i < local.touching.size; local.i++) {
+			if (local.touching[local.i] == NIL)
+				continue
+			for (local.j = 0; local.j < local.touching.size; local.j++) {
+				if (local.i == local.j || local.touching[local.j] == NIL)
+					continue
+				if (int(local.touching[local.i][0]) == int(local.touching[local.j][0]) && int(local.touching[local.i][1]) == int(local.touching[local.j][1])) {
+					if (local.touching[local.i][2] > local.touching[local.j][2])
+						local.touching[local.i] = NIL
+					else
+						local.touching[local.j] = NIL
+				}
+			}
+		}
+		for (local.i = 0; local.i < local.touching.size; local.i++) {
+			if (local.touching[local.i] != NIL)
+				waitthread arson local.touching[local.i]
+		}
+	} else {
+		self.scale = self.scale * (local.newradius / self.ff_radius)
+		self.ff_radius = local.newradius
+		self setsize ( (self.ff_radius * -1.0) (self.ff_radius * -1.0) 0 ) ( self.ff_radius self.ff_radius (self.ff_radius * 2.4) )
+	}*/
+end
+
+fire_extinguish local.fireent:
+	local.fireent.ff_health -= 2.0 * level.ff_frametime * float(getcvar(ff_extinguishmult))
+end

@@ -1,0 +1,74 @@
+main:
+	if (level.mohr_running)
+		end
+	level.mohr_running = 1
+	
+	level waittill prespawn
+	level waittill spawn
+
+	println "mohrs: starting main loop"
+	while (1) {
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if ($player[local.i].mohr_ingame == NIL || $player[local.i].mohr_ingame == NULL || $player[local.i].mohr_ingame == 0)
+				$player[local.i] waitthread client_begin
+			if ($player[local.i].mohr_ingame != 2)
+				continue
+			if (!isAlive($player[local.i]) || $player[local.i].dmteam != $player[local.i].mohr_team) {
+				$player[local.i] waitthread client_death
+				continue
+			}
+			$player[local.i] waitthread client_think
+		}
+		for (local.i = 1; local.i <= $mohr_trigger.size; local.i++) {
+			if (!$mohr_trigger[local.i].player)
+				$mohr_trigger[local.i] delete
+		}
+		waitframe
+	}
+end
+
+client_think:
+	self waitthread global/mohreal/weapons.scr::spreadcontrol
+	if ((self getposition)[0] == "c")
+		self.mohr_stance = 1
+	else
+		self.mohr_stance = 0
+end
+
+client_begin:
+	self.mohr_trigger = spawn trigger_multipleall targetname "mohr_trigger" setthread "global/mohreal/main.scr::client_spawn" origin (self.origin) wait 0
+	self.mohr_trigger setsize ( -4 -4 0 ) ( 4 4 8 )
+	self.mohr_trigger.player = self
+	self.mohr_trigger glue self
+	self.mohr_ingame = 1
+	//iprintlnbold "CLIENT BEGAN"
+end
+
+client_spawn:
+	local.player = parm.other
+	if (local.player != self.player)
+		end
+	self delete
+	local.player.mohr_trigger = spawn trigger_multiple targetname "mohr_trigger" setthread "global/mohreal/main.scr::suppression" origin (local.player.origin) spawnflags 128 //wait 0
+	local.player.mohr_trigger setsize ( -32 -32 0 ) ( 32 32 124 )
+	local.player.mohr_trigger.player = local.player
+	local.player.mohr_trigger glue local.player
+	local.player.mohr_team = local.player.dmteam
+	local.player.mohr_ingame = 2
+	//iprintlnbold "CLIENT SPAWNED"
+end
+
+client_death:
+	if (self.mohr_trigger)
+		self.mohr_trigger delete
+	self.mohr_ingame = 0
+	//iprintlnbold "CLIENT DIED"
+end
+
+suppression:
+	//iprintlnbold "RECEIVED DAMAGE FROM " parm.other
+	local.str = getcvar("g_mohr_suppressed")
+	local.hex = waitthread global/mohreal/lib.scr::inthex (int((level.time - 0.05) * 1000))	// advance the suppression by one frame so that it doesn't flash
+	local.str = waitthread global/mohreal/lib.scr::strncpy local.str (self.player.entnum * 9) local.hex 0 8
+	setcvar "g_mohr_suppressed" local.str
+end

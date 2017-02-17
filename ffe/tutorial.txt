@@ -1,0 +1,51 @@
+Fire-For-Effect! support tutorial
+by Rookie One
+=================================
+
+
+
+
+So you think you're tough enough to implement FFE support in some non-stock map? :) Good. Let's get going!
+
+
+
+
+I'm going to show you how to create a preset for a map. This is needed only the map's skybox is not a box (e.g. on V2 and Algiers stock maps) or when the skybox touches one or more buildings' roof (practically it means that you can call fire support inside buildings). In such case you need to either change the shape of the skybox or use an alternative method of height tracing. I'll show you how to fix it the second way.
+
+First of all, create a text file, name it just like the map but give it a .scr extension and place it in global/fire_for_effect/map_presets/ with the same path as the map (e.g. if the map is dm/dm_mymap, the file should be saved as MoHAA/main/global/fire_for_effect/map_presets/dm/dm_mymap.scr). Insert these lines in it:
+
+
+level.ffe_method = "skybox" // can be skybox, zones (bounds of zones where fire support cannot be called) or xzones (bounds of the only zones where fire support can be called) or a number for tracing the specified number of units up from the call location
+level.ffe_artillery = 1 // enables artillery strikes on the map
+level.ffe_airstrike = 1 // enables airstrikes on the map
+end 1 // this is to indicate that the preset ran OK
+
+
+The comments describe each of the lines.
+
+I implemented 4 methods of height tracing in FFE. The first, skybox, traces the highest solid surface (which is in most cases the skybox) and then traces down from that surface to the next solid one. This method works perfectly on all maps that have a regular, cubic skybox that doesn't touch any building's roof. The second method is zones. There are predefined zones in the map script and if some player tries to call fire support inside one of these zones, the call fails with a "cannot see target" message. This method is used in the Algiers map. The third one is xzones. It's very similar to zones, but it works the other way around - they are the only zones you can call fire support in. If a call occurs beyond them, it fails with a "cannot see target" message. This method is used in V2 rocket facility where there is less outdoor areas than indoors and it was much less work this way. :) The last, but not least, is a nameless method. :) Just type some number and the script will try to trace from the given number units up from the call location. It's just left in case it would suit some custom map. However, I recommend using the skybox method instead.
+
+If you've decided to use the zones or xzones method, read on. If not, you should have enough information to cope without a step-by-step tutorial. ;)
+
+Now you need to get the bounds of the zones. The bounds are just origins. There are several ways to do this - you can either decompile the map and get the origins in Radiant or get ingame and find them out with the coord command. When you get the zones bounds, you can either write a preset for a map and send it to me (:P) or just include the information in the map script. These is the preset for V2 rocket facility:
+
+level.ffe_method = "xzones" // can be skybox, zones (bounds of zones where fire support cannot be called) or xzones (bounds of the only zones where fire support can be called) or a number for tracing the specified number of units up from the call location.
+
+
+// zone definitions
+level.ffe_zones[1] = ( -943 1504 0 )::( -1135 1328 0 )
+level.ffe_zones[2] = ( -3263 1328 0 )::( -975 -1528 0 )
+level.ffe_zones[3] = ( 1097 -1656 0 )::( 5176 320 0 )
+level.ffe_zones[4] = ( 5176 320 0 )::( 1648 2256 0 )
+level.ffe_zones[5] = ( 1648 2256 0 )::( 1552 2256 0 )
+level.ffe_zones[6] = ( 1552 2240 0 )::( 1656 1936 0 )
+level.ffe_zones[7] = ( 1656 1936 0 )::( 1560 1240 0 )
+level.ffe_zones[8] = ( 3360 2363 0 )::( 5184 2939 0 )
+end 1 // this is to indicate that the preset ran OK
+
+
+I came up with the presets thingy for better organisation and more map-independence.
+
+You should be able to add FFE-support to your map now. See you on the battlefield, soldier, and better take cover if you see me with binoculars! ]:->
+
+Rookie One

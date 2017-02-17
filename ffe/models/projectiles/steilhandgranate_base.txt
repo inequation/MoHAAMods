@@ -1,0 +1,61 @@
+setup
+{
+//	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	scale 0.6	// Needs to be unnaturally large so it is visible
+	path models/projectiles/steilhandgranate
+	skelmodel steilhandgranate.skd
+	surface origin shader blank
+	surface tag_barrel shader blank
+	surface material1 shader stielhandgranate
+	surface material2 shader stielhandgranate
+	surface material3 shader stielhandgranate
+
+}
+
+
+init
+{
+	server
+	{
+		classname Projectile
+		anim idle
+		setsize       "-2 -2 -2" "2 2 2"
+		speed         700
+		minspeed      300
+		life			4.0
+		dmlife			6.5
+		hitdamage     10
+		health        50
+		takedamage
+		meansofdeath		grenade
+//		impactmarkshader      blastmark
+//		impactmarkradius      50
+//		impactmarkorientation random
+		explosionmodel models/fx/M2FGrenadeExplosion.tik
+		bouncetouch
+		bouncesound			grenade_bounce_soft
+		bouncesound_metal	grenade_bounce_metal
+		bouncesound_hard	grenade_bounce_hard
+		bouncesound_water	grenade_bounce_water
+//		notouchdamage
+		smashthroughglass 64
+		gravity 0.8
+		avelocity random 90 random 90 60
+
+		cache blastmark.spr
+		cache models/fx/M2FGrenadeExplosion.tik
+	}
+}
+
+animations
+{
+//	idle	steilhandgranate.skc
+	idle	grenade_ping.skc
+	{
+		server
+		{
+			first ai_event grenade 384	// explosion radius is 256
+			last anim idle			// HACK! for some reason, server events don't get reposted after looping
+		}
+	}
+}

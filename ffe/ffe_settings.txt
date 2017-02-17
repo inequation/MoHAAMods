@@ -1,0 +1,43 @@
+// Fire-For-Effect! Modification
+// Written by Rookie One
+// configuration file
+
+// Determines how often the instructions are displayed
+local.settings["instruction_frequency"] = 120
+
+// Whether or not let the players call artillery support; 1 = yes, 0 = no
+local.settings["artillery"] = 1
+
+// Whether or not let the players call airstrikes; 0 = no, 1 = traditional 6-explosion airstrike, 2 = 3-huge-explosion airstrike
+local.settings["airstrike"] = 1
+
+// The number of fire missions a team can call at the same moment
+local.settings["firemissions"] = 4
+
+// Fire mission timer value
+local.settings["firemissiontimer"] = 40
+
+// Fire mission timer delay (initial fire mission timer value is counted by subtracting this delay from fire mission timer value)
+local.settings["firemissiontimerdelay"] = 20
+
+end local.settings
+
+localize:
+	// Lines below are used for localization
+	local.ized["Use your binoculars to call artillery support (aim somewhere and click fire)."] = "Use your binoculars to call artillery support (aim somewhere and click fire)."
+	local.ized["Use smoke grenades (Stielhandgranaten) to call airstrikes."] = "Use smoke grenades (Stielhandgranaten) to call airstrikes."
+	local.ized["One fire mission can be called each "] = "One fire mission can be called each "
+	local.ized[" seconds."] = " seconds."
+	local.ized["ARTILLERY SUPPORT: Cannot see target!"] = "ARTILLERY SUPPORT: Cannot see target!"
+	local.ized["ARTILLERY SUPPORT: Firing for effect!"] = "ARTILLERY SUPPORT: Firing for effect!"
+	local.ized["ARTILLERY SUPPORT: Insufficient fire support! Next fire mission available in "] = "ARTILLERY SUPPORT: Insufficient fire support! Next fire mission available in "
+	local.ized[" seconds!"] = " seconds!"
+	local.ized["AIR SUPPORT: Aborting, cannot see target!"] = "AIR SUPPORT: Aborting, cannot see target!"
+	local.ized["AIR SUPPORT: Affirmative! On my way!"] = "AIR SUPPORT: Affirmative! On my way!"
+	local.ized["AIR SUPPORT: Too many airstrikes requested! Next fire mission available in "] = "AIR SUPPORT: Too many airstrikes requested! Next fire mission available in "
+	//local.ized[" seconds!"] = " seconds!"
+	local.ized["Not enough power to call fire support! Charging will take "] = "Not enough power to call fire support! Charging will take "
+	local.ized[" more seconds!"] = " more seconds!"
+	local.ized["Charging complete!"] = "Charging complete!"
+	local.ized["Fire-For-Effect has been shut down!"] = "Fire-For-Effect has been shut down!"
+end local.ized

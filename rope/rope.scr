@@ -1,0 +1,329 @@
+main:
+	if (level.r_running)
+		end
+	level.r_running = 1
+
+	level waittill prespawn
+	level waittill spawn
+
+	// set some default values
+	if (!int(getcvar("p_numSegments")))
+		setcvar "p_numSegments" "10"
+	if (!int(getcvar("p_randomizeOrder")))
+		setcvar "p_randomizeOrder" "1"
+	if (!int(getcvar("p_segmentLength")))
+		setcvar "p_segmentLength" "32"
+	if (!int(getcvar("p_throwSpeed")))
+		setcvar "p_throwSpeed" "1000"
+	if (!int(getcvar("p_numSolveIterations")))
+		setcvar "p_numSolveIterations" "1"
+	if (!int(getcvar("p_errorCorrectionMult")))
+		setcvar "p_errorCorrectionMult" "0.9"
+
+	println "rope: starting main loop"
+	local.levelTime = -0.05
+	while (1) {
+		level.r_frameTime = level.time - local.levelTime
+		level.r_invFrameTime = 1.0 / level.r_frameTime
+		local.levelTime = level.time
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if (!$player[local.i].r_ingame) {
+				$player[local.i] waitthread client_begin
+				continue
+			}
+			if ($player[local.i].r_ingame == 1 && $player[local.i].max_health != 101) {
+				$player[local.i] waitthread client_spawn
+				continue
+			}
+			if ($player[local.i].r_ingame != 2)
+				continue
+			if (!isAlive($player[local.i]) || $player[local.i].dmteam != $player[local.i].r_team) {
+				$player[local.i] waitthread client_death
+				continue
+			}
+			$player[local.i] waitthread client_think
+		}
+		// advance the nodes
+		if ($r_node) {
+			for (local.i = 1; local.i <= $r_node.size; local.i++)
+				$r_node[local.i] waitthread advance_node
+		}
+		// process the constraints
+		if (level.r_constraints && level.r_constraints.size) {
+			// calculate per-frame constants and apply error correction
+			for (local.i = 1; local.i <= level.r_constraints.size; local.i++)
+				level.r_constraints[local.i] waitthread prepare_constraint
+			// solve the constraints according to the law of momentum conservation
+			if (bool(getcvar("p_randomizeOrder"))) {
+				// prepare an index array
+				for (local.i = 1; local.i <= level.r_constraints.size; local.i++)
+					local.indices[local.i] = local.i
+				for (local.i = 0; local.i < int(getcvar("p_numSolveIterations")); local.i++) {
+					// scramble the array
+					local.swaps = 1 + randomint(level.r_constraints.size)
+					for (local.j = 1; local.j <= local.swaps; local.j++) {
+						local.k = 1 + randomint(level.r_constraints.size)
+						local.temp = local.indices[local.j]
+						local.indices[local.j] = local.indices[local.k]
+						local.indices[local.k] = local.temp
+					}
+					/*local.debugstr = "indices:"
+					for (local.j = 1; local.j <= level.r_constraints.size; local.j++)
+						local.debugstr = local.debugstr + " " + string(local.indices[local.j])
+					iprintln_noloc local.debugstr*/
+					// do the actual solving
+					for (local.j = 1; local.j <= level.r_constraints.size; local.j++)
+						level.r_constraints[local.indices[local.j]] waitthread solve_constraint
+				}
+			} else {
+				for (local.i = 0; local.i < int(getcvar("p_numSolveIterations")); local.i++) {
+					for (local.j = 1; local.j <= level.r_constraints.size; local.j++)
+						level.r_constraints[local.j] waitthread solve_constraint
+				}
+			}
+		}
+		waitframe
+	}
+end
+
+client_begin:
+	self.r_ingame = 1
+	self.max_health = 101
+	//iprintlnbold "CLIENT BEGAN"
+end
+
+client_spawn:
+	self.r_rope_start = self waitthread create_rope
+	self.r_rope_start waitthread update_beam
+	self.r_team = self.dmteam
+	self.r_ingame = 2
+	//iprintlnbold "CLIENT SPAWNED"
+end
+
+client_death:
+	if (self.r_rope_start) {
+		local.temp = NIL
+		local.next = self.r_rope_start
+		while (local.next) {
+			local.temp = local.next
+			local.next = local.temp.r_next
+			if (local.temp.r_beam)
+				local.temp.r_beam delete
+			local.temp delete
+		}
+	}
+	self.r_ingame = 0
+	//iprintlnbold "CLIENT DIED"
+end
+
+client_think:
+	if (self.useheld) {
+		/*local.fwdvec = angles_toforward self.viewangles
+		local.temp = NIL
+		local.next = self.r_rope_start
+		while (local.next) {
+			local.temp = local.next
+			local.next = local.temp.r_next
+			local.temp.origin = (self gettagposition "eyes bone") + local.fwdvec * 32.0
+			local.temp.velocity = ( 0 0 0 )
+		}*/
+		self.r_useheld = 1
+	} else if (self.r_useheld) {
+		local.fwdvec = angles_toforward self.viewangles
+		self.r_useheld = 0
+		self.r_rope_start physics_on 1
+		self.r_rope_start thread stick
+		self.r_rope_start.stuck = 0
+		local.temp = NIL
+		local.next = self.r_rope_start
+		while (local.next) {
+			local.temp = local.next
+			local.next = local.temp.r_next
+			//local.temp.origin = (self gettagposition "eyes bone") + local.fwdvec * 32.0
+			local.temp.origin = (self gettagposition "eyes bone") + self.forwardvector * 64.0
+			local.temp.velocity = ( 0 0 0 )
+			local.temp physics_on 1
+			local.temp notsolid
+		}
+		local.v = local.fwdvec * float(getcvar("p_throwSpeed"))
+		local.v += self.velocity
+		self.r_rope_start.velocity = local.v
+	}
+	// reenable physics on all nodes
+	// this should prevent them from hanging in mid-air for no apparent reason
+	/*local.temp = NIL
+	local.next = self.r_rope_start
+	while (local.next) {
+		local.temp = local.next
+		local.next = local.temp.r_next
+		local.v = local.temp.velocity
+		local.temp physics_off
+		local.temp.velocity = ( 0 0 0 )
+		local.temp physics_on 1
+		local.temp notsolid
+		local.temp physics_velocity local.v
+	}*/
+	self.r_rope_start waitthread update_beam
+end
+
+update_beam:
+	local.temp = NIL
+	local.next = self
+	while (local.next && local.next.r_beam) {
+		local.temp = local.next
+		local.next = local.temp.r_next
+		local.temp.r_beam.origin = local.temp.origin
+		local.temp.r_beam endpoint local.next.origin
+	}
+end
+
+create_rope:
+	local.start = spawn script_object origin ((self gettagposition "eyes bone") + self.forwardvector * 64.0) //model "models/static/hedgehog.tik" scale 0.15 angles "90 0 0" //"models/static/corona_util.tik"
+	//local.start = spawn TossObject origin ((self gettagposition "eyes bone") + self.forwardvector * 64.0)
+	local.start setsize ( -1 -1 -1 ) ( 1 1 1 )
+	local.start.r_mass = 30
+	local.start physics_on 1
+	local.start notsolid
+	// spawn a visual indicator of the beginning of the rope
+	local.start.r_anchor = spawn animate model "models/static/hedgehog.tik" scale 0.15 origin (local.start.origin + ( 0.6 0.0 -7.8 ))
+	local.start.r_anchor notsolid
+	local.start.r_anchor bind local.start
+	local.parent = local.start
+	for (local.i = 0; local.i < int(getcvar("p_numSegments")); local.i++) {
+		local.parent.r_next = spawn script_object origin ((self gettagposition "eyes bone") + self.forwardvector * 64.0)
+		//local.parent.r_next = spawn TossObject origin ((self gettagposition "eyes bone") + self.forwardvector * 64.0)
+		if (int(getcvar("p_debugNodes")))
+			local.parent.r_next.model = "models/static/corona_util.tik"
+		local.parent.r_next setsize ( -1 -1 -1 ) ( 1 1 1 )
+		local.parent.r_next.r_mass = 2
+		local.parent.r_next physics_on 1
+		local.parent.r_next notsolid
+		waitthread create_constraint local.parent local.parent.r_next (float(getcvar("p_segmentLength")))
+		local.parent.r_beam = waitthread create_beam
+		local.parent = local.parent.r_next
+	}
+end local.start
+
+create_beam:
+	local.beam = spawn func_beam
+	local.beam shader textures/common/black
+	local.beam maxoffset 0.0
+	local.beam minoffset 0.0
+	local.beam numsegments 1
+	local.beam alwaysdraw
+	local.beam life 0.0
+	local.beam.scale = 2.0
+	local.beam activate
+	local.beam notsolid
+end local.beam
+
+create_constraint local.ent1 local.ent2 local.dist:
+	if (!level.r_constraints)
+		local.n = 1
+	else
+		local.n = level.r_constraints.size + 1
+	level.r_constraints[local.n] = spawn Listener
+	local.c = level.r_constraints[local.n]
+	local.c.bodyA = local.ent1
+	local.c.bodyB = local.ent2
+	local.c.dist = local.dist
+	local.c.invMassSum = 1.0 / (local.ent1.r_mass + local.ent2.r_mass)
+	// correction impulse scale according to the masses
+	local.c.correctionScale = local.ent2.r_mass * local.c.invMassSum
+end
+
+prepare_constraint:
+	if (!self.bodyA || !self.bodyB || self.bodyA.stuck) {
+		self waitthread delete_from_array	// nothing left to do for us
+		end
+	}
+	// physics engine bug: resting bodies will have their velocity set to ( 0 0 1 ) for some reason
+	// precalculate information constant throughout all iterations this frame
+	local.axis = self.bodyB.origin - self.bodyA.origin
+	local.d = vector_length local.axis
+	self.error = local.d - self.dist
+	// find the direction from body A to body B
+	// if the distance between nodes is zero, create a random direction just to push them away from each other
+	if (local.d < 0.001)
+		self.axis = ( (randomfloat(2)) (randomfloat(2)) (randomfloat(2)) ) - ( 1.0 1.0 1.0 )
+	else
+		self.axis = vector_normalize local.axis
+	// treat extreme cases of error
+	if (abs(self.error) < 0.001)	// not bad at all, no need to correct
+		end
+	else if (abs(self.error) > self.dist * 2.0) {
+		iprintln_noloc "large error: " self.error " (dist = " self.dist ")"
+		local.p = trace self.bodyA.origin (self.bodyA.origin + self.axis * self.dist) 0 ( -1 -1 -1 ) ( 1 1 1 )
+		// bias towards body A because it's nearer the chain head
+		// changing the origin manually disables physics
+		// reenabling physics resets velocity
+		// therefore cancel out the velocity by applying a negate vector
+		//self.bodyB physics_velocity (self.bodyB.velocity * -1.0)
+		self.bodyB.velocity = ( 0 0 0 )
+		self.bodyB.origin = local.p
+		self.bodyB physics_on 1
+		self.bodyB notsolid
+		self.bodyB physics_velocity self.bodyA.velocity
+		self.bodyB.velocity = self.bodyA.velocity
+		// start over again
+		// the axis direction doesn't change, only the distance does
+		local.d = vector_length (self.bodyA.origin - self.bodyB.origin)
+		self.error = local.d - self.dist
+	}
+	// calculate the correction velocity
+	local.correction = self.error * level.r_invFrameTime * float(getcvar("p_errorCorrectionMult"))	// v = S/t; t = frame time
+	//iprintln_noloc "error = " self.error " corr = " local.correction
+	// apply the error correction
+	self.bodyA physics_velocity (local.axis * (local.correction * self.correctionScale))
+	self.bodyB physics_velocity (local.axis * -(local.correction * (1.0 - self.correctionScale)))
+	/*self.bodyA.velocity += (local.axis * (local.correction * self.correctionScale))
+	self.bodyB.velocity += (local.axis * -(local.correction * (1.0 - self.correctionScale)))*/
+	self waitthread solve_constraint
+end
+
+/*prepare_constraint:
+	if (!self.bodyA || !self.bodyB) {
+		self waitthread delete_from_array	// nothing left to do for us
+		end
+	}
+	// physics engine bug: resting bodies will have their velocity set to ( 0 0 1 ) for some reason
+	// precalculate information constant throughout all iterations this frame
+	local.axis = self.bodyB.origin - self.bodyA.origin
+	local.d = vector_length local.axis
+	self.error = local.d - self.dist
+	// find the direction from body A to body B
+	// if the distance between nodes is zero, create a random direction just to push them away from each other
+	if (local.d < 0.001)
+		self.axis = ( (randomfloat(2)) (randomfloat(2)) (randomfloat(2)) ) - ( 1.0 1.0 1.0 )
+	else
+		self.axis = vector_normalize local.axis
+end*/
+
+solve_constraint:
+	// project the velocities onto the connection axis
+	local.v1 = vector_dot self.bodyA.velocity self.axis
+	local.v2 = vector_dot self.bodyB.velocity self.axis
+	// cancel out the projected velocities as we'll be replacing the entire motion along that axis
+	self.bodyA physics_velocity (self.axis * -local.v1)
+	self.bodyB physics_velocity (self.axis * -local.v2)
+	/*self.bodyA.velocity -= self.bodyA.velocity
+	self.bodyB.velocity -= self.bodyB.velocity*/
+	// solve according to the law of momentum conservation
+	local.v = (local.v1 * self.bodyA.r_mass + local.v2 * self.bodyB.r_mass) * self.invMassSum
+	//iprintln_noloc "v1 = " local.v1 " v2 = " local.v2 " v = " local.v
+	// apply the new velocities
+	self.bodyA physics_velocity (self.axis * local.v)
+	self.bodyB physics_velocity (self.axis * local.v)
+	/*self.bodyA.velocity += (self.axis * local.v)
+	self.bodyB.velocity += (self.axis * local.v)*/
+end
+
+stick:
+	iprintlnbold "waiting for stick"
+	//waitframe
+	self waittill touch
+	iprintlnbold "STUCK"
+	self.stuck = 1
+	self physics_off
+end
+

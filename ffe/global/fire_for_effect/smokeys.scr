@@ -1,0 +1,4 @@
+// this is a hack that just indicates we are using the smoke nades
+main:
+	local.var = 1
+end local.var

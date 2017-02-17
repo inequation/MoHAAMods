@@ -1,0 +1,696 @@
+// Portal gun mod
+// Written by Leszek "IneQuation" Godlewski (a.k.a. Rookie One)
+
+// "primary" and "secondary" arguments are called from the state files
+// gun origin argument can be supplied if execing from the map script, e.g.
+//   exec global/portal.scr ( 100 200 300 )
+main local.arg local.donotrespawn:
+	if (local.arg) {
+		if (local.arg == "primary") {
+			if (!level.prtl_lock) {	// start the mod if it's not running yet
+				thread start
+				waitframe
+			}
+			self waitthread make_portal 0	// blue
+			end
+		} else if (local.arg == "secondary") {
+			if (!level.prtl_lock) {	// start the mod if it's not running yet
+				thread start
+				waitframe
+			}
+			self waitthread make_portal 1	// yellow
+			end
+		} else
+			level.prtl_gun_org = local.arg
+	} else if (level.prtl_lock) {
+		println "portal: already running"
+		end
+	}
+start:
+	level.prtl_lock = 1
+	
+	// for surface and content flags IDs
+	exec global/exttrace.scr
+
+	/*setcvar "thereisnomonkey" "1"
+	setcvar "cheats" "1"*/
+
+	println "portal: up and running"
+	
+	setcvar "g_statefile" "global/portal"
+	
+	level waittill prespawn
+	
+	// cache sounds
+	local.master = spawn ScriptMaster
+	local.master aliascache portal_gun_fire sound/mechanics/Mec_GeneratorOff_01.wav soundparms 1.0 0.3 1.0 0.0 320 2200 item loaded maps "m dm obj"
+	local.master aliascache portal_open1 sound/weapons/fire/nebelwerfer1.wav soundparms 1.0 0.3 1.0 0.0 320 2200 item loaded maps "m dm obj"
+	local.master aliascache portal_open2 sound/weapons/fire/nebelwerfer2.wav soundparms 1.0 0.3 1.0 0.0 320 2200 item loaded maps "m dm obj"
+	local.master aliascache portal_open3 sound/weapons/fire/nebelwerfer3.wav soundparms 1.0 0.3 1.0 0.0 320 2200 item loaded maps "m dm obj"
+	local.master aliascache portal_close sound/weapons/vehicle/veh_track_revdown.wav soundparms 1.0 0.3 1.0 0.0 320 2200 item loaded maps "m dm obj"
+
+	level waittill spawn
+
+	// beams to visualize and debug normal or TBN matrix calculation
+	level.prtl_debug = int(getcvar("prtl_debug"))
+	if (level.prtl_debug) {
+		for (local.i = 1; local.i <= 4; local.i++) {
+			local.beam = spawn func_beam targetname "testbeam" origin ( 0 0 0 )
+			local.beam endpoint ( 0 0 0 )
+			local.beam alpha 1.0
+			local.colour = ( 0 0 0 )
+			if (local.i & 1)
+				local.colour += ( 1 0 0 )
+			if (local.i & 2)
+				local.colour += ( 0 1 0 )
+			if (local.i & 4)
+				local.colour += ( 0 0 1 )
+			local.beam color local.colour
+			local.beam maxoffset 0
+			local.beam minoffset 0
+			local.beam numsegments 1
+			local.beam alwaysdraw
+			local.beam life 0
+			local.beam activate
+		}
+	}
+
+	// whether to give a portal gun to everyone on spawn
+	level.prtl_gun_spawn = bool(getcvar("prtl_gun_giveOnSpawn"))
+	// if no spawn location specified, force spawning with the gun
+	if (!level.prtl_gun_spawn && !level.prtl_gun_org)
+		level.prtl_gun_spawn = bool(1)
+	// spawn the gun once, game will keep respawning it
+	if (!level.prtl_gun_spawn) {
+		local.weap = waitthread create_gun level.prtl_gun_org
+		local.weap light 1 0 0 100
+		if (!local.donotrespawn)
+			local.weap set_respawn 1
+		else
+			local.weap cnt 1
+		local.rt = float(getcvar("prtl_gun_respawnTime"))
+		if (local.rt != 0.0)
+			local.weap set_respawn_time local.rt
+		local.weap thread gun_animate
+	}
+
+	// number of beams that make up the portal ring
+	// use with caution, each portal will use this number of func_beam entities
+	// more beams means nicer, smoother circles but also increased resource and bandwidth usage
+	level.prtl_num_beams = int(getcvar("prtl_numBeams"))
+	if (level.prtl_num_beams < 3)	// a triangle is a minimum
+		level.prtl_num_beams = 12	// default value
+
+	while (1) {
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if (!$player[local.i].prtl_state) {
+				$player[local.i] waitthread client_begin
+				continue
+			}
+			if ($player[local.i].prtl_state == 1 && $player[local.i].max_health != 101) {
+				$player[local.i] waitthread client_spawn
+				continue
+			}
+			if (!isAlive($player[local.i]) && $player[local.i].prtl_state != 1) {
+				$player[local.i] waitthread client_death
+				continue
+			}
+			//$player[local.i] waitthread client_frame
+		}
+		// delete leftover portals
+		for (local.i = 1; local.i <= $portals.size; local.i++) {
+			if (!$portals[local.i].player)
+				$portals[local.i] waitthread portal_close 0
+			else
+				$portals[local.i].corona waitthread corona_move
+		}
+		waitframe
+	}
+end
+
+// Let's call this the "Godlewski sine approximation" in my own honour. :P
+// It's not exactly a sine, but it's close enough for us and MUCH faster than a Taylor expansion implementation
+// since it only performs 1 multiplication and some additions/subtractions (number of which is proportional to
+// the magnitude of input value) during value normalization, and 2 multiplications and 3 additions/subtractions
+// during the actual output computation. Also, it doesn't have the memory cost of a lookup table.
+// Basically it works like this: we have 2 quadratic equations whose plots together look very much like a sine
+// wave:
+// y = -4(x - 0.5)^2 + 1 for x that belongs to [0..1]
+// y = 4(x - 1.5)^2 - 1 for x that belongs to [1..2]
+// We normalize the input to fall in the [0..2] range and apply one of the equations accordingly.
+// The magnitude of error ranges from 0 to about 0.06, which is unnoticeable in the vast majority of cases.
+// However, if further precision is required, the error can be reduced by several orders of magnitude down to
+// a negligible value, as it can be approximated quite accurately with a 3rd degree polynomial.
+sin local.x:
+	// normalize the input
+	//local.x = local.x / 3.14159265358979323846
+	local.x = local.x * 0.31830988618379067154	// 1/pi, because multiplication is faster than division
+	// calculate the value relative to period
+	while (local.x < 0.0)
+		local.x += 2.0
+	while (local.x > 2.0)
+		local.x -= 2.0
+	goto _sin_normalized	// moved to a separate label so that this part of the code can be shared between sin and cos
+end
+
+_sin_normalized:
+	// fast special case
+	if (local.x == 0.0 || local.x == 1.0 || local.x == 2.0)
+		end 0.0
+	// pick range and calculate result
+	if (local.x < 1) {
+		local.x -= 0.5
+		end ( -4.0 * local.x * local.x + 1.0)
+	}
+	local.x -= 1.5
+end (4.0 * local.x * local.x - 1.0)
+
+// A cosine approximation that uses the same principle:
+cos local.x:
+	// normalize the input
+	local.x = 0.5 + local.x * 0.31830988618379067154	// move the plot by a half to the left to achieve cosine
+	// calculate the value relative to period
+	while (local.x < 0.0)
+		local.x += 2.0
+	while (local.x > 2.0)
+		local.x -= 2.0
+	goto _sin_normalized	// moved to a separate label so that this part of the code can be shared between sin and cos
+end
+
+client_begin:
+	self.max_health = 101
+	self.prtl_state = 1
+	//iprintlnbold "CLIENT BEGAN"
+end
+
+client_spawn:
+	self.prtl_state = 2
+	if (level.prtl_gun_spawn) {
+		//self item "models/weapons/silencedpistol.tik"
+		self take "models/weapons/colt45.tik"
+		self take "models/weapons/p38.tik"
+		waitframe
+		local.weap = waitthread create_gun self.origin
+		local.weap.origin = self.origin
+		local.weap doUse self
+	}
+	//iprintlnbold "CLIENT SPAWNED"
+end
+
+client_death:
+	self.prtl_state = 0
+	if (self.prtl_blue)
+		self.prtl_blue waitthread portal_close 0
+	if (self.prtl_yellow)
+		self.prtl_yellow waitthread portal_close 0
+	//iprintlnbold "CLIENT DIED"
+end
+
+create_gun local.org:
+	local.weap = spawn models/weapons/silencedpistol.tik origin local.org targetname "portal_gun"
+	local.weap usenoammo 1
+	local.weap dmbulletcount 0
+	local.weap dmammorequired 0
+end local.weap
+
+gun_animate:
+	local.org = self.origin
+	local.ang = 0
+	while (self) {
+		if (local.ang > 360)
+			local.ang -= 360
+		local.phase = (level.time * 0.6 - int(level.time * 0.6)) * 6.28318530717958647693
+		self.origin = local.org + ((waitthread sin local.phase) * ( 0 0 6 ))
+		self.angles = ( 0 local.ang 180 )
+		local.ang += 5
+		waitframe
+	}
+end
+
+get_normal local.v1 local.v2 local.v3:
+	local.d1 = local.v2 - local.v1
+	local.d2 = local.v3 - local.v1
+	local.normal = vector_cross local.d1 local.d2
+end (vector_normalize local.normal)
+
+make_teleporter_trace:
+	local.fwd = angles_toforward self.viewangles
+	local.left = angles_toleft self.viewangles
+	local.up = angles_toup self.viewangles
+	local.start = self gettagposition "eyes bone" + local.fwd * 24
+	local.end = local.start  + local.fwd * 16384
+	local.point = trace local.start local.end 0 ( -16 -16 -16 ) ( 16 16 16 )
+	if (local.point == local.start)
+		end NIL
+	local.normal = waitthread global/exttrace.scr::strtovec (getcvar(xt_plane_normal))
+	local.surf = int(getcvar(xt_surfaceFlags))
+	iprintlnbold "flags: " (waitthread global/exttrace.scr::surface_flags_to_string local.surf)
+	// don't allow placing portals on metal and sky surfaces
+	if (local.surf & level.SURF_METAL || local.surf & level.SURF_GRILL || local.surf & level.SURF_SKY)
+		end NIL
+	// check if there's enough space for a player to fit in - we don't want people to get stuck in walls
+	// The code below is disabled because it has a logical flaw. It was written with a point trace (i.e.
+	// a 0x0x0 box) in mind and was supposed to check if the trigger would fit in the X and Y directons.
+	// Due to the way the Quake collision detection works, however, it could return false positives in
+	// certain situations, so I went on to use a 32x32x32 box trace and only check the vertical space
+	// instead.
+	/*local.nspace = ( 0 0 0 )
+	local.pspace = ( 0 0 0 )
+	local.end = local.point + ( -32 0 0 )
+	local.spacetrace = trace local.point local.end 0 ( 0 -16 -48 ) ( 1 16 48 )
+	local.nspace[0] = local.point[0] - local.spacetrace[0]
+	local.end = local.point + ( 32 0 0 )
+	local.spacetrace = trace local.point local.end 0 ( -1 -16 -48 ) ( 0 16 48 )
+	local.pspace[0] = local.spacetrace[0] - local.point[0]
+	local.end = local.point + ( 0 -32 0 )
+	local.spacetrace = trace local.point local.end 0 ( -16 0 -48 ) ( 16 1 48 )
+	local.nspace[1] = local.point[1] - local.spacetrace[1]
+	local.end = local.point + ( 0 32 0 )
+	local.spacetrace = trace local.point local.end 0 ( -16 -1 -48 ) ( 16 0 48 )
+	local.pspace[1] = local.spacetrace[1] - local.point[1]*/
+	local.end = local.point + ( 0 0 -92 )
+	local.spacetrace = trace local.point local.end 0 ( -16 -16 0 ) ( 16 16 1 )
+	local.nspace/*[2]*/ = local.point[2] - local.spacetrace[2]
+	local.end = local.point + ( 0 0 92 )
+	local.spacetrace = trace local.point local.end 0 ( -16 -16 -1 ) ( 16 16 0 )
+	local.pspace/*[2]*/ = local.spacetrace[2] - local.point[2]
+	/*if (local.nspace[0] < 16 || local.pspace[0] < 16) {
+		if (local.nspace[0] + local.pspace[0] < 32)
+			end NIL
+		if (local.nspace[0] < local.pspace[0])
+			local.point[0] += (16 - local.nspace[0])
+		else
+			local.point[0] -= (16 - local.pspace[0])
+	}
+	if (local.nspace[1] < 16 || local.pspace[1] < 16) {
+		if (local.nspace[1] + local.pspace[1] < 32)
+			end NIL
+		if (local.nspace[1] < local.pspace[1])
+			local.point[1] += (16 - local.nspace[1])
+		else
+			local.point[1] -= (16 - local.pspace[1])
+	}*/
+	//iprintlnbold "Space: " local.nspace " " local.pspace
+	if (local.nspace/*[2]*/ < 46 || local.pspace/*[2]*/ < 46) {
+		if (local.nspace/*[2]*/ + local.pspace/*[2]*/ < 92)
+			end NIL
+		if (local.nspace/*[2]*/ < local.pspace/*[2]*/)
+			local.point[2] += (46 - local.nspace/*[2]*/)
+		else
+			local.point[2] -= (46 - local.pspace/*[2]*/)
+	}
+	// old surface sampling-based normal calculation code
+/*
+	local.end = local.point + local.fwd * 512 + local.left * 48 + local.up * 48
+	local.sample1 = trace local.point local.end 0
+	local.end = local.point + local.fwd * 512 + local.left * 48 - local.up * 48
+	local.sample2 = trace local.point local.end 0
+	local.end = local.point + local.fwd * 512 - local.left * 48 + local.up * 48
+	local.sample3 = trace local.point local.end 0
+	local.end = local.point + local.fwd * 512 - local.left * 48 - local.up * 48
+	local.sample4 = trace local.point local.end 0
+	// draw debug beams to illustrate how surface normal is calculated
+	if (level.prtl_debug == 1) {
+		for (local.i = 1; local.i <= 4; local.i++)
+			$testbeam[local.i].origin = local.point
+		$testbeam[1] endpoint local.sample1
+		$testbeam[2] endpoint local.sample2
+		$testbeam[3] endpoint local.sample3
+		$testbeam[4] endpoint local.sample4
+	}
+	local.normal1 = waitthread get_normal local.sample2 local.sample1 local.sample3
+	local.normal2 = waitthread get_normal local.sample2 local.sample3 local.sample4
+	local.normal = vector_normalize(local.normal1 + local.normal2)
+*/
+	// lower the point to account for player origin
+	local.point[2] -= 46
+	local.data[0] = local.point
+	local.data[1] = local.normal
+end local.data
+
+display_beam local.org local.end local.colour:
+	local.beam = spawn func_beam origin local.org
+	local.beam endpoint local.end
+	local.beam alpha 1.0
+	local.beam color local.colour
+	local.beam maxoffset 0
+	local.beam minoffset 0
+	local.beam numsegments 1
+	local.beam alwaysdraw
+	local.beam life 0
+	local.beam activate
+	local.beam commanddelay 0.1 delete	// disappear after 2 frames
+end
+
+make_portal local.yellow:
+	// make us notsolid for the duration of the trace, otherwise the trace may hit ourselves
+	self notsolid
+	local.point = (self waitthread make_teleporter_trace ( -16 -16 0 ) ( 16 16 96 ))
+	self solid
+	// the weird thing about beams is that if the sum of their colour components is low
+	// enough, they become transparent, regardless of the alpha setting; no idea why
+	// this happens
+	if (local.yellow)
+		local.colour = ( 1.0 0.9 0.0 )	// give it an orangeish tint
+	else
+		local.colour = ( 0.0 0.5 1.0 )
+	//iprintlnbold "origin: " local.point[0] " normal: " local.point[1]
+	// audio cue
+	self playsound portal_gun_fire
+	local.ringpoint = local.point[0]
+	if (!local.point || !local.point[0] || !local.point[1]) {
+		local.colour = ( 1.0 0.0 0.0 )	// red -> warning
+		thread display_beam (self gettagposition "tag_weapon_right") (trace (self gettagposition "tag_weapon_right") ((self gettagposition "eyes bone") + (angles_toforward self.viewangles) * 2048)) local.colour
+		end
+	}
+	// keep the ring in a consistent distance of 4 units from the surface, taking the slope into account
+	if (local.point[1][2] > 0.57735026918962576451)
+		local.ringpoint += ( 0 0 4 )
+	else if (local.point[1][2] < -0.57735026918962576451)
+		local.ringpoint += ( 0 0 88 )
+	else	// near vertical surface, keep the ring in the mid height of the trigger
+		local.ringpoint += ( 0 0 46 )
+	thread display_beam (self gettagposition "tag_weapon_right") local.ringpoint local.colour
+	if (local.yellow)
+		local.portal = self.prtl_yellow
+	else
+		local.portal = self.prtl_blue
+	if (!local.portal) {
+		if (local.yellow) {
+			self.prtl_yellow = spawn trigger_multipleall targetname "portals" origin local.point[0] spawnflags 16 setthread "global/portal.scr::teleport"
+			local.portal = self.prtl_yellow
+		} else {
+			self.prtl_blue = spawn trigger_multipleall targetname "portals" origin local.point[0] spawnflags 16 setthread "global/portal.scr::teleport"
+			local.portal = self.prtl_blue
+		}
+		local.portal setsize ( -16 -16 0 ) ( 16 16 92 )
+		local.portal.colour = local.colour
+		for (local.i = 0; local.i < level.prtl_num_beams; local.i++) {
+			local.portal.beams[local.i] = spawn func_beam origin local.ringpoint
+			local.portal.beams[local.i] endpoint local.ringpoint
+			local.portal.beams[local.i] color local.colour
+			local.portal.beams[local.i] maxoffset 0
+			local.portal.beams[local.i] minoffset 0
+			local.portal.beams[local.i] numsegments 1
+			local.portal.beams[local.i] alwaysdraw
+			local.portal.beams[local.i] delay 0
+			local.portal.beams[local.i] life 0
+			local.portal.beams[local.i].scale = 6
+			local.portal.beams[local.i] activate
+		}
+		local.portal.player = self
+	} else {
+		local.portal waitthread portal_close 1
+		local.portal.origin = local.point[0]
+	}
+	local.portal.corona = spawn animate model "models/static/corona_util.tik"
+	local.portal.corona.trigger = local.portal
+	local.portal.corona.point = local.ringpoint
+	local.portal.corona notsolid
+	if (level.prtl_debug)
+		local.portal.corona hide
+
+	// compute the rotation matrix - we use it to transform velocity from
+	// one portal's tangent space to another's
+	local.portal.rotmat = waitthread calc_portal_matrix local.point[1] self
+	/*iprintln "M " local.portal.rotmat[0]
+	iprintln "M " local.portal.rotmat[1]
+	iprintln "M " local.portal.rotmat[2]*/
+
+	if (level.prtl_debug == 2) {
+		for (local.i = 1; local.i <= 3; local.i++) {
+			$testbeam[local.i].origin = local.point[0]
+			$testbeam[local.i] endpoint (local.point[0] + (local.portal.rotmat[local.i - 1] * 16.0))
+		}
+	}
+
+	local.portal waitthread portal_open
+end
+
+teleport:
+	local.ent = parm.other
+	if (self == self.player.prtl_blue)
+		local.target = self.player.prtl_yellow
+	else
+		local.target = self.player.prtl_blue
+	if (!local.target)
+		end
+	self nottriggerable
+	local.target nottriggerable
+	// indicate that the portal is blocked
+	self.corona.model = "models/fx/corona_red.tik"
+	local.target.model = "models/fx/corona_red.tik"
+	if (local.ent.classname == "Player" || local.ent.classname == "Actor") {
+		//iprintlnbold "TELEPORTING PLAYER OR ACTOR"
+		thread poof (local.ent.origin + ( 0 0 46 ))
+		local.vel = local.ent.velocity
+		local.ent.origin = local.target.origin
+		thread poof (local.ent.origin + ( 0 0 46 ))
+		local.viewvec = angles_toforward local.ent.viewangles
+	} else {
+		//iprintlnbold "TELEPORTING PROJECTILE"
+		thread poof local.ent.origin
+		local.vel = local.ent.velocity
+		local.zoffset = self.rotmat[0] * (vector_dot self.rotmat[0] (local.ent.origin - self.origin))
+		local.ent.origin = local.target.origin + local.zoffset
+		thread poof local.ent.origin
+	}
+
+	//iprintln "vel in: " local.vel
+
+	// reflect any motion in the direction away from the portal as it may
+	// cause the player to get stuck in a solid after teleportation
+	// disabled for now, can cause erratic transformations
+	/*local.axvel = vector_dot local.vel self.rotmat[0]
+	if (local.axvel > 0.0)
+		local.vel = local.vel - (self.rotmat[0] * (2.0 * local.axvel))*/
+
+	// decompose the velocity into scalars along the portal's tangent space vectors
+	// NOTE: this is *not* a vector! we only keep them as a one for convenience, their
+	// semantics is different
+	local.temp = waitthread mult_by_matrix local.vel self.rotmat
+	// negate the forward and left vectors' signs because a portal matrix always points
+	// (with its forward vector) away from it, whereas here we're "entering" it
+	local.vel = ( (local.temp[0] * -1.0) (local.temp[1] * -1.0) local.temp[2] )
+
+	//iprintln "vel thru: " local.vel
+
+	// use the scalars to find the transformed velocity
+	local.vel = local.target.rotmat[0] * local.vel[0] + local.target.rotmat[1] * local.vel[1] + local.target.rotmat[2] * local.vel[2]
+	// boost the velocity along the normal a bit
+	local.vel += local.target.rotmat[0] * 50.0
+
+	//iprintln "vel out: " local.vel
+
+	// transform view axis, too
+	if (local.viewvec) {
+		local.temp = waitthread mult_by_matrix local.viewvec self.rotmat
+		local.view = ( (local.temp[0] * -1.0) (local.temp[1] * -1.0) local.temp[2] )
+		local.view = (local.target.rotmat[0] * local.view[0]) + (local.target.rotmat[1] * local.view[1]) + (local.target.rotmat[2] * local.view[2])
+		local.ent.viewangles = vector_toangles local.view
+	}
+
+	// due to a physics engine deficiency we have to wait a frame before applying
+	// our new velocity, or it just won't be used
+	// zero the current velocity on this frame to prevent getting stuck in walls
+	local.ent.velocity = ( 0 0 0 )
+	waitframe
+	local.ent.velocity = local.vel	// apply transformed velocity
+	while (local.ent && local.ent isTouching local.target)
+		waitframe
+	if (self) {
+		self triggerable
+		self.corona.model = "models/static/corona_util.tik"
+	}
+	if (local.target) {
+		local.target triggerable
+		local.target.corona.model = "models/static/corona_util.tik"
+	}
+end
+
+// a funny, little special effect
+poof local.org:
+	local.ent = spawn models/emitters/gren_exp.tik
+	local.ent.origin = local.org
+	local.ent.scale = 0.5
+	local.ent notsolid
+	local.ent anim start
+	wait 1
+	local.ent delete
+end
+
+exit_block:
+	self.blocktime = level.time
+end
+
+corona_move:
+	if (self.scalephase >= 0) {
+		while (self.scalephase > 6.28318530717958647693)
+			self.scalephase -= 6.28318530717958647693
+		self.scalephase += 0.1
+		self.scale = 5.0 + ((waitthread sin self.scalephase) * 0.5)
+	}
+	if (self.motionphase >= 0) {
+		while (self.motionphase > 6.28318530717958647693)
+			self.motionphase -= 6.28318530717958647693
+		self.motionphase += 0.07
+		self.origin = self.point + (self.trigger.rotmat[0] * ((waitthread sin self.motionphase) * 8.0 + 4.0))
+	}
+end
+
+corona_grow:
+	for (local.s = 0; local.s <= 5.0; local.s += 0.5) {
+		self.scale = local.s
+		waitframe
+	}
+	self.scalephase = 0.0
+	self.motionphase = 0.0
+end
+
+ring_grow local.beams:
+	local.centre = self.origin
+	// keep the ring in a consistent distance of 4 units from the surface, taking the slope into account
+	if (self.rotmat[0][2] > 0.57735026918962576451)
+		local.centre += ( 0 0 4 )
+	else if (self.rotmat[0][2] < -0.57735026918962576451)
+		local.centre += ( 0 0 88 )
+	else	// near vertical surface, keep the ring in the mid height of the trigger
+		local.centre += ( 0 0 46 )
+	//local.tstep = 80.0 / 10
+	local.rstep = 360.0 / float(local.beams.size)
+	//for (local.i = 0.0; local.i <= 80.0; local.i += local.tstep) {
+	for (local.i = 0; local.i <= 80; local.i += 8) {
+		local.f = -0.0125 * float(local.i * local.i) + 2.0 * float(local.i)
+		for (local.b = 0; local.b < local.beams.size; local.b++) {
+			// align the ring to the surface slope
+			local.vec = local.centre + (waitthread align_to_surf (local.b * local.rstep) self.rotmat) * local.f
+			local.beams[local.b].origin = local.vec
+			if (local.b == 0)
+				local.beams[local.beams.size - 1] endpoint local.vec
+			else
+				local.beams[local.b - 1] endpoint local.vec
+		}
+		waitframe
+	}
+end
+
+portal_open:
+	self.corona.origin = self.corona.point
+	self.corona.scale = 0.00001	// scale 0 doesn't always work as expected
+	self.corona thread corona_grow
+	self thread ring_grow self.beams
+	self.corona.scalephase = -1
+	self.corona.motionphase = -1
+	// audio cue
+	self playsound portal_open
+end
+
+corona_shrink:
+	local.step = self.scale / 10.0
+	for (local.s = self.scale - local.step; local.s >= 0.0; local.s -= local.step) {
+		self.scale = local.s
+		waitframe
+	}
+	self delete
+end
+
+ring_shrink local.beams local.mat local.org:
+	local.point = local.org
+	if (local.mat[0][2] > 0.57735026918962576451)
+		local.point += ( 0 0 4 )
+	else if (local.mat[0][2] < -0.57735026918962576451)
+		local.point += ( 0 0 88 )
+	else
+		local.point += ( 0 0 46 )
+	local.tstep = 80.0 / 10
+	local.rstep = 360.0 / float(local.beams.size)
+	for (local.i = 80.0; local.i >= 0.0; local.i -= local.tstep) {
+		for (local.b = 0; local.b < local.beams.size; local.b++) {
+			// align the ring to the surface slope
+			local.vec = local.point + (waitthread align_to_surf (local.b * local.rstep) local.mat) * local.i
+			local.beams[local.b].origin = local.vec
+			if (local.b == 0)
+				local.beams[local.beams.size - 1] endpoint local.vec
+			else
+				local.beams[local.b - 1] endpoint local.vec
+		}
+		waitframe
+	}
+	for (local.i = local.beams.size - 1; local.i >= 0; local.i--)
+		local.beams[local.i] delete
+end
+
+align_to_surf local.ang local.m:
+	local.dir = angles_toforward ( 0 local.ang 0 )
+	// why does this work?
+	local.vec = local.m[0] * local.dir[2] + local.m[1] * local.dir[1] + local.m[2] * local.dir[0]
+end local.vec
+
+portal_close local.keep:
+	local.corona = spawn animate model self.corona.model origin self.corona.origin
+	local.corona.scale = self.corona.scale
+	local.corona.scalephase = -1
+	local.corona.motionphase = -1
+	local.corona notsolid
+	// audio cue - play it on the corona, it lives longer than the portal itself
+	local.corona playsound portal_close
+	self.corona delete
+	if (local.keep) {
+		for (local.i = 0; local.i < self.beams.size; local.i++) {
+			local.beams[local.i] = spawn func_beam origin self.origin
+			local.beams[local.i] endpoint self.origin
+			local.beams[local.i] color self.colour
+			local.beams[local.i] maxoffset 0
+			local.beams[local.i] minoffset 0
+			local.beams[local.i] numsegments 1
+			local.beams[local.i] alwaysdraw
+			local.beams[local.i] life 0
+			local.beams[local.i] delay 0
+			local.beams[local.i].scale = 6
+			local.beams[local.i] activate
+		}
+		thread ring_shrink local.beams self.rotmat self.origin
+	} else
+		thread ring_shrink self.beams self.rotmat self.origin
+	local.corona thread corona_shrink
+	if (!local.keep)
+		self delete
+end
+
+// This calculates a rotation matrix which defines the tangent space of a surface (i.e. the orientation
+// of a surface in world space). It's similar to a TBN matrix used in computer graphics, but it doesn't
+// use texture coordinates to find the tangent and binormal vectors, but depends on a player's
+// orientation instead. Also, it uses a different coordinate system, with the normal being the 0th row,
+// not the 2nd. All of this is because we want the portal's bottom to be where the player's perceived
+// bottom is, not the texture's.
+calc_portal_matrix local.normal local.player:
+	// normal vector - perpendicular to surface
+	local.mat[0] = local.normal
+
+	// use the player's orientation to calculate the other vectors
+	// try using the right vector to calculate the tangent first as it stands a better chance
+	// at not being colinear with the normal
+	local.rightvec = angles_toleft local.player.viewangles	// angles_toleft actually returns right vector...
+	local.dot = vector_dot local.rightvec local.normal
+	if (abs(local.dot) > 0.71) {
+		// ahh, they are colinear, use the up vector to find a binormal instead
+		local.upvec = angles_toup local.player.viewangles
+		local.dot = vector_dot local.upvec local.normal
+
+		// binormal vector - coplanar with surface, direction "up"
+		local.mat[2] = vector_normalize (local.upvec - (local.normal * local.dot))
+	
+		// tangent vector - coplanar with surface, direction "left"
+		local.mat[1] = vector_normalize (vector_cross local.mat[2] local.mat[0])
+	} else {
+		// tangent vector - coplanar with surface, direction "left"
+		local.mat[1] = vector_normalize (local.rightvec - (local.normal * local.dot))
+	
+		// binormal vector - coplanar with surface, direction "up"
+		local.mat[2] = vector_normalize (vector_cross local.mat[0] local.mat[1])
+	}
+end local.mat
+
+mult_by_matrix local.v local.m:
+	local.vec = ( (vector_dot local.v local.m[0]) (vector_dot local.v local.m[1]) (vector_dot local.v local.m[2]) )
+end local.vec

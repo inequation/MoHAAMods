@@ -1,0 +1,60 @@
+TIKI
+setup
+{
+	//scale 10
+	path models/projectiles/paintball
+	skelmodel paintball.skd
+	surface paintball shader paintball_green
+}
+
+
+init
+{
+	server
+	{
+		classname Projectile
+		anim idle
+		setsize			"-0.5 -0.5 -0.5" "0.5 0.5 0.5"
+		speed			4800
+		life			10.0
+		dmlife			10.0
+		hitdamage		200
+		health			50000
+		nodamage
+		meansofdeath		bullet
+		explosionmodel		models/fx/paintballsplat.tik
+		explodeontouch
+		impactmarkshader	paintball_splat_green
+		impactmarkradius	15
+		impactmarkorientation	random
+		smashthroughglass 2000
+
+		cache blastmark.spr
+		cache models/fx/paintballsplat.tik
+		cache models/fx/paintballdummy.tik
+	}
+	// the trail makes it easier to debug trajectory
+	client
+	{
+		originemitter debugtrail
+		(
+			spawnrate 60
+			model vsssource.spr
+			color 0 1 0
+			life 30
+			scale 0.2
+		)
+	}
+}
+
+animations
+{
+	idle	paintball.skc
+	{
+		server
+		{
+			first exec global/paintball/ballistics.scr
+			last anim idle			// HACK! for some reason, server events don't get reposted after looping
+		}
+	}
+}

@@ -1,0 +1,663 @@
+// Survival horror mod
+// Written by Rookie One
+
+main:
+	if (level.sh_running)
+		end
+	level.sh_running = 1
+	
+	level.sh_version = "0.7 Halloween Edition"
+	
+	if (int(getcvar(nohorror)))
+	{
+		println "[HORROR]: Nohorror cvar set. Terminating."
+		end
+	}
+	
+	if (int(getcvar(g_gametype)) != 2)
+	{
+		println "[HORROR]: Improper gametype. Terminating."
+		end
+	}
+	if (int(getcvar(shortversion)) > 1)
+	{
+		println "[HORROR]: Expansion packs are not supported. Terminating."
+		end
+	}
+	
+	// retrieve murderer counts from previous level
+	// this needs a major rewrite, let's focus on other things for now
+/*	if (game.sh_murderers != NIL && game.sh_murderers != NULL) {
+		local.i = 0;
+		while (local.i < game.sh_murderers.size) {
+			local.cl = ""
+			local.t = ""
+			while (game.sh_murderers[local.i] != ":") {
+				local.cl = local.cl + game.sh_murderers[local.i]
+				local.i++
+			}
+			local.cl = int(local.cl)
+			while (game.sh_murderers[local.i] != " " && local.i < game.sh_murderers.size) {
+				local.t = local.t + game.sh_murderers[local.i]
+				local.i++
+			}
+			local.t = int(local.t)
+			for (local.j = 1; local.j <= $player.size; local.j++) {
+				if ($player[local.j].entnum == local.cl) {
+					$player[local.j].sh_times = local.t
+					break
+				}
+			}
+		}
+	}*/
+	
+	if (int(getcvar(horror_timelimit)))
+		level.sh_murderertimelimit = int(getcvar(horror_timelimit))
+	else
+		level.sh_murderertimelimit = 120
+
+	setcvar "g_gametypestring" "Survival Horror"
+	
+	level waittill prespawn
+	
+	local.master = spawn ScriptMaster
+	local.master aliascache thunder1 sound/amb/Amb_Thunder_01.wav soundparms 1.0 0.0 1.0 0.0 10000 10000 local streamed maps "m dm obj train "
+	local.master aliascache thunder2 sound/amb/Amb_Thunder_02.wav soundparms 1.0 0.0 1.0 0.0 10000 10000 local streamed maps "m dm obj train "
+	local.master aliascache thunder3 sound/amb/Amb_Thunder_03.wav soundparms 1.0 0.0 1.0 0.0 10000 10000 local streamed maps "m dm obj train "
+	local.master aliascache creepy1 sound/amb/Amb_BranchBreaking01.wav soundparms 1.0 0.0 1.0 0.0 500 3000 auto loaded maps "m dm obj train "
+	local.master aliascache creepy2 sound/amb/Amb_BranchBreaking02.wav soundparms 1.0 0.0 1.0 0.0 500 3000 auto loaded maps "m dm obj train "
+	local.master aliascache creepy3 sound/characters/fs_metalcreak_01.wav soundparms 0.6 0.4 0.7 0.6 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy4 sound/characters/fs_metalcreak_02.wav soundparms 0.6 0.4 0.7 0.6 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy5 sound/characters/fs_metalcreak_03.wav soundparms 0.6 0.4 0.7 0.6 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy6 sound/characters/fs_metalcreak_05.wav soundparms 0.6 0.4 0.7 0.6 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy7 sound/characters/fs_metalcreak_06.wav soundparms 0.6 0.4 0.7 0.6 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy8 sound/characters/fs_woodcreak_01.wav soundparms 0.9 0.2 0.9 0.2 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy9 sound/characters/fs_woodcreak_04.wav soundparms 0.9 0.2 0.9 0.2 160 1600 auto loaded maps "m dm obj train "
+	local.master aliascache creepy10 sound/mechanics/m1l2b_disabletruck01.wav soundparms 1.5 0.0 0.8 0.2 160 1600 item loaded maps "m dm obj train "
+	local.master aliascache creepy11 sound/mechanics/m1l2b_disabletruck02.wav soundparms 1.5 0.0 0.8 0.2 160 1600 item loaded maps "m dm obj train "
+	local.master aliascache creepy12 sound/mechanics/m1l2b_disabletruck03.wav soundparms 1.5 0.0 0.8 0.2 160 1600 item loaded maps "m dm obj train "
+	local.master aliascache creepy13 sound/mechanics/m1l2b_disabletruck04.wav soundparms 1.5 0.0 0.8 0.2 160 1600 item loaded maps "m dm obj train "
+	local.master aliascache creepy14 sound/mechanics/Mec_ShutterSqueak_01.wav soundparms 0.5 0.2 0.8 0.4 250 2500 item loaded maps "m dm obj train "
+	local.master aliascache creepy15 sound/mechanics/Mec_ShutterSqueak_02.wav soundparms 0.5 0.2 0.8 0.4 250 2500 item loaded maps "m dm obj train "
+	local.master aliascache creepy16 sound/mechanics/Mec_ShutterSqueak_03.wav soundparms 0.5 0.2 0.8 0.4 250 2500 item loaded maps "m dm obj train "
+	local.master aliascache creepy17 sound/mechanics/Mec_ShutterSqueak_04.wav soundparms 0.5 0.2 0.8 0.4 250 2500 item loaded maps "m dm obj train "
+	local.master aliascache creepy18 sound/mechanics/Mec_ShutterHit_01.wav soundparms 0.5 0.2 0.8 0.4 250 2500 item loaded maps "m dm obj train "
+	local.master aliascache lookout1 sound/dialogue/Generic/A/sighted/dfr_sighted_02e_1.wav soundparms 1.0 0.0 1.0 0.0 10000 10000 local streamed maps "m dm obj train "
+	local.master aliascache lookout2 sound/dialogue/Generic/A/sighted/dfr_sighted_02k_1.wav soundparms 1.0 0.0 1.0 0.0 10000 10000 local streamed maps "m dm obj train "
+
+	// this needs a major rewrite, let's focus on other things for now
+	// run the map's preset
+	/*local.preset = "global/horror/presets/" + getcvar(mapname) + ".scr"
+	println "[HORROR]: Attempting to load map preset " local.preset "..."
+	if (!(waitexec local.preset local.master))
+		println "[HORROR]: Failed!"
+	else
+		println "[HORROR]: Done."*/
+	
+	level waittill spawn
+
+	setcvar "g_obj_alliedtext1" "- Survive!"
+	setcvar "g_obj_alliedtext2" "- Kill the Murderer!"
+	setcvar "g_obj_alliedtext3" "- DO NOT TEAMKILL!"
+	setcvar "g_obj_axistext1" ""
+	setcvar "g_obj_axistext2" ""
+	setcvar "g_obj_axistext3" ""
+		
+	$world farplane 1600
+	$world farplane_color ( 0 0 0 )
+	$world farplane_cull 1
+	thread forcefastsky_showadvert
+	thread mysteriousmusic
+	thread storm
+	thread sounds
+	
+	level.sh_ingame = 0
+
+	wait 10
+
+	while (1)
+	{
+		local.ingame = 0
+		for (local.i = 1; local.i <= $player.size; local.i++)
+		{
+			if (!$player[local.i].sh_done)
+			{
+				$player[local.i].sh_done = 1
+				$player[local.i] thread player_thinker
+			}
+			if (isAlive($player[local.i]) && $player[local.i].dmteam != spectator)
+			{
+				if ($player[local.i] != level.sh_murderer && $player[local.i].dmteam == axis && $player[local.i].sh_ingame)
+				{
+					$player[local.i] thread gobackallies
+				}
+			}
+			if ((!isAlive($player[local.i]) || $player[local.i].dmteam == spectator) && $player[local.i].sh_ingame)
+			{
+				$player[local.i].sh_done = 0
+				$player[local.i].sh_ingame = 0
+			}
+		}
+		level.sh_ingame = local.ingame
+		if (level.sh_murderer == NIL)
+		{
+			waitframe // just in case the player handling part detects the missing killer
+			if (level.sh_murderer == NIL || level.sh_murderer == NULL)
+				thread select_murderer
+		}
+		waitframe
+	}
+end
+
+forcefastsky_showadvert:
+	wait 2
+	while (1)
+	{
+		huddraw_align 104 left bottom
+		huddraw_color 104 0.0 0.25 1.0
+		huddraw_font 104 handle-22
+		huddraw_alpha 104 0.0
+		local.text = ("Survival Horror mod v" + level.sh_version + " by IneQuation\nhttp://IQstudios.QuakeDev.com/")
+		huddraw_rect 104 16 -185 0 0
+		huddraw_string 104 local.text
+		huddraw_rect 105 16 -135 0 0
+		huddraw_align 105 left bottom
+		huddraw_alpha 105 0.0
+		huddraw_color 105 0.75 0.75 0.75
+		huddraw_font 105 facfont-20
+		huddraw_string 105 "Kill the phantom Murderer before he kills you all!\nThe Murderer is invisble as long as he doesn't shoot or touch other players.\nPlayers take turns to be the Murderer."
+		for (local.alpha = 0.0; local.alpha <= 1.0; local.alpha += 0.1)
+		{
+			huddraw_alpha 104 local.alpha
+			huddraw_alpha 105 local.alpha
+			wait 0.1
+		}
+		wait 8
+		for (local.alpha = 1.0; local.alpha >= 0.0; local.alpha -= 0.1)
+		{
+			huddraw_alpha 104 local.alpha
+			huddraw_alpha 105 local.alpha
+			wait 0.1
+		}
+		$player stufftext "r_fastsky 1"
+		wait 10
+		$player stufftext "r_fastsky 1"
+		wait 10
+		$player stufftext "r_fastsky 1"
+		wait 10
+		$player stufftext "r_fastsky 1"
+		wait 10
+		$player stufftext "r_fastsky 1"
+		wait 10
+	}
+end
+
+mysteriousmusic:
+	local.music[1][0] = "sound/music/mus_06a_mystery.mp3"
+	local.music[1][1] = 220
+	local.music[2][0] = "sound/music/mus_15a_mystery.mp3"
+	local.music[2][1] = 197
+	local.music[3][0] = "sound/music/mus_16a_mystery.mp3"
+	local.music[3][1] = 204
+	local.music[4][0] = "sound/music/mus_17a_mystery.mp3"
+	local.music[4][1] = 282
+	local.music[5][0] = "sound/music/mus_17b_mystery.mp3"
+	local.music[5][1] = 60
+	local.music[6][0] = "sound/music/mus_17d_mystery.mp3"
+	local.music[6][1] = 123
+	local.music[7][0] = "sound/music/mus_Schmerzen_01g.mp3"
+	local.music[7][1] = 125
+	local.music[8][0] = "sound/music/mus_SniperTown_01b.mp3"
+	local.music[8][1] = 69
+	local.music[9][0] = "sound/music/mus_SniperTown_01f.mp3"
+	local.music[9][1] = 105
+	local.last = 0
+	wait 2
+	while (1)
+	{
+		local.num = randomint(local.music.size) + 1
+		while (local.num == local.last)
+			local.num = randomint(local.music.size) + 1
+		local.last = local.num
+		$player stufftext ("tmstop;tmstart " + local.music[local.num][0])
+		wait (local.music[local.num][1])
+	}
+end
+
+player_thinker:
+	self.sh_ingame = 0
+	if (self.sh_times == NIL)
+		self.sh_times = 0
+	local.trg = spawn trigger_multiple origin self.origin
+	local.trg glue self
+	local.trg.player = self
+	local.trg setthread global/horror.scr::player_spawned
+	while (self && local.trg)
+		waitframe
+	if (local.trg)
+		local.trg delete
+end
+
+player_spawned:
+	if (parm.other == self.player)
+	{
+		local.player = self.player
+		self delete
+		local.player.sh_soundtime = level.time + 25.0 + randomfloat(15)
+		local.player.sh_ingame = 1
+		//waitframe
+		/*else
+		{
+			while (isAlive(local.player) && level.sh_murderer != local.player)
+			{
+				if (local.player.dmteam == axis)
+				{
+					local.player iprint "Stay on the allied team, please!"
+					local.player kill
+					local.player join_team allies
+				}
+				waitframe
+			}
+		}
+		local.player.sh_done = 0
+		local.player.sh_ingame = 0*/
+	}
+end
+
+storm:
+	while (1)
+	{
+		wait (10 + randomint(15))
+		local.num = (randomint (3) + 1)
+		switch (local.num)
+		{
+			case 1:
+				$world farplane_color ( 0.9 0.9 0.9 )
+				// this needs a major rewrite, let's focus on other things for now
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.2*/
+				wait 0.2
+				$world farplane_color ( 0 0 0 )
+				wait 1
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.1*/
+				wait 0.1
+				$world farplane_color ( 0 0 0 )
+				wait 0.1
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.1*/
+				wait 0.1
+				$world farplane_color ( 0 0 0 )
+				wait (1 + randomfloat(2))
+				break
+			case 2:
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.1*/
+				wait 0.1
+				$world farplane_color ( 0 0 0 )
+				wait 0.1
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.1*/
+				wait 0.1
+				$world farplane_color ( 0 0 0 )
+				wait 1
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.2*/
+				wait 0.2
+				$world farplane_color ( 0 0 0 )
+				wait (1 + randomfloat(2))
+				break
+			case 3:
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.1*/
+				wait 0.1
+				$world farplane_color ( 0 0 0 )
+				wait 0.1
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.2*/
+				wait 0.2
+				$world farplane_color ( 0 0 0 )
+				wait 0.5
+				$world farplane_color ( 0.9 0.9 0.9 )
+				/*if (level.sh_preset["storm"] != NIL)
+					thread level.sh_preset["storm"] 0.1*/
+				wait 0.1
+				$world farplane_color ( 0 0 0 )
+				wait (1 + randomfloat(2))
+				break
+		}
+		$world playsound thunder
+	}
+end
+
+select_murderer:
+	if (level.sh_selecting) // selecting already in progress
+		end
+	local.ingame = 0
+	local.least = 524288 // virtually impossible to reach eh?
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		if ($player[local.i].sh_ingame)
+			local.ingame++
+		if ($player[local.i].sh_times != NIL) { // prevent idiotic errors
+			if ($player[local.i].sh_times < local.least)
+				local.least = $player[local.i].times
+		}
+	}
+	if (local.ingame < 2) // no point in playing this on your own
+		end
+	// don't run this thread again
+	level.sh_selecting = 1
+	
+	local.lastmurderer = level.sh_murderer
+murderer_tryagain:
+	local.murderer = local.lastmurderer
+	
+	local.ingame = 0
+	local.least = 524288 // virtually impossible to reach eh?
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		if ($player[local.i].sh_ingame)
+			local.ingame++
+		if ($player[local.i].sh_times != NIL) { // prevent idiotic errors
+			if ($player[local.i].sh_times < local.least)
+				local.least = $player[local.i].times
+		}
+	}
+	if (local.ingame < 2) // no point in playing this on your own
+		end
+		
+	while ((local.murderer == local.lastmurderer || local.murderer.dmteam == spectator) && $player.size > 1)
+	{
+		local.murderer = $player[randomint($player.size) + 1]
+		waitframe
+	}
+	if (local.murderer == NIL || local.murderer == NULL || local.murderer.sh_times > local.least)
+	{
+		waitframe
+		goto murderer_tryagain
+	}
+	
+	local.murderer.sh_times++ // account for the times they played the murderer for
+	//waitthread updatetimes // update the inter-level times information
+	level.sh_murderer = local.murderer
+	while (!level.sh_murderer.sh_ingame)
+		waitframe
+	level.sh_selecting = 0
+	// Spearhead code doesn't work anyway, stick to AA
+	//if (int(getcvar(shortversion)) < 2)
+	//{
+		local.murderer join_team axis
+		local.murderer respawn
+		waitframe
+	/*}
+	else
+	{
+		//local.murderer thread expansionpack_detector
+		//while (local.murderer.dmteam != axis && !local.murderer.sh_ingame)
+		while (local.murderer.dmteam != axis)
+		{
+			local.murderer join_team axis
+			local.murderer primarydmweapon rifle
+			waitframe
+		}
+		local.murderer stufftext "popmenu"
+		//iprintlnbold local.murderer.dmteam
+	}*/
+	//if (isAlive(local.murderer) && local.murderer.dmteam == axis)
+	//{
+		level.sh_selecting = 0
+		iprintln_noloc " "
+		iprintln_noloc " "
+		iprintlnbold_noloc "The Murderer has been chosen. Beware!"
+		iprintln_noloc "He's invisible... But only as long as he doesn't shoot or touch you."
+		iprintln_noloc "You can also hear him. Kill him before he kills you!"
+		$world playsound lookout
+		local.murderer iprint " "
+		local.murderer iprint "You have become the Murderer!" 1
+		local.murderer iprint "You have been given a silenced pistol. You are invisible, but only as long as you don't shoot"
+		local.murderer iprint ("or touch someone. You have " + level.sh_murderertimelimit + " seconds of rampage (or less,")
+		local.murderer iprint "in case you get killed) before it's someone else's turn to be the Murderer!"
+		local.murderer takeall
+		local.murderer hide
+		local.murderer model "models/player/german_Panzer_Tankcommander.tik"
+		local.murderer forcelegsstate STAND
+		local.murderer forcetorsostate STAND
+		local.murderer.sh_hidden = 1
+		waitframe
+		local.murderer svflags "+broadcast"
+		local.murderer item "models/weapons/silencedpistol.tik"
+		local.murderer useweaponclass pistol
+		waitframe
+		// Spearhead code doesn't work anyway, stick to AA
+		//if (int(getcvar(shortversion)) < 2)
+		//{
+			local.murderer weaponcommand dual dmammorequired 0
+			local.murderer weaponcommand dual usenoammo 1
+			local.murderer weaponcommand dual dmfiredelay 1
+			local.murderer weaponcommand dual dmmovementspeed 1.0
+			local.murderer weaponcommand dual notdroppable
+			local.murderer weaponcommand dual dmbulletdamage 60
+			local.murderer weaponcommand dual dmbulletspread 25 25 150 150
+		/*}
+		else
+		{
+			local.murderer weaponcommand dual ammorequired 0
+			local.murderer weaponcommand dual usenoammo 1
+			local.murderer weaponcommand dual firedelay 1
+			local.murderer weaponcommand dual movementspeed 1.0
+			local.murderer weaponcommand dual notdroppable
+			local.murderer weaponcommand dual bulletdamage 60
+			local.murderer weaponcommand dual bulletspread 25 25 150 150
+		}*/
+		local.murderer face ( 0 local.murderer.viewangles[1] 0 )
+		local.murderer.sh_murdererexpiry = level.time + level.sh_murderertimelimit
+		while (isAlive(local.murderer) && level.sh_murderer == local.murderer && local.murderer.dmteam == axis)
+		{
+			local.lastmin = local.min
+			local.lastsec = local.sec
+			local.sec = int(local.murderer.sh_murdererexpiry - level.time)
+			local.min = int(local.sec / 60)
+			local.sec -= local.min * 60
+			if (local.sec != local.lastsec || local.min != local.lastmin) {
+				huddraw_alpha 106 1
+				huddraw_rect 106 435 100 640 480
+				huddraw_virtualsize 106 1
+				huddraw_font 106 verdana-14
+				huddraw_color 106 .75 0 0
+				huddraw_string 106 "MURDERER TIME LEFT:"
+				huddraw_alpha 107 1
+				huddraw_rect 107 580 98 640 480
+				huddraw_virtualsize 107 1
+				huddraw_font 107 courier-20
+				local.timestr = local.min + ":"
+				if (local.sec < 10)
+					local.timestr = local.timestr + "0"
+				local.timestr = local.timestr + local.sec
+				huddraw_string 107 local.timestr
+				huddraw_color 107 1 1 1
+			}
+			if (local.min == 0) {
+				if (local.sec <= 30 && local.sec > 10)
+					huddraw_color 107 1 1 0
+				else if (local.sec < 10)
+					huddraw_color 107 1 0 0
+			}
+
+			if (local.murderer.fireheld)
+			{
+				if (local.murderer.sh_hidden)
+				{
+					local.murderer light 1 0 0 300
+					local.murderer show
+					local.murderer.sh_hidden = 0
+					local.murderer.sh_hidetime = level.time + 0.25
+				}
+			}
+			// make him visible if he's touching somebody else
+			for (local.i = 1; local.i <= $player.size; local.i++) {
+				if (!$player[local.i].sh_ingame)
+					continue
+				if ($player[local.i].dmteam == axis)
+					continue
+				if (vector_length ($player[local.i].origin - local.murderer.origin) <= 48) {
+					local.murderer show
+					local.murderer.sh_hidetime = level.time + 0.25
+					local.murderer.sh_hidden = 0
+				}
+			}
+			if (!local.murderer.sh_hidden && level.time >= local.murderer.sh_hidetime) {
+				local.murderer lightOff
+				local.murderer hide
+				local.murderer.sh_hidden = 1
+			}
+			local.murderer take "models/weapons/colt45.tik"
+			local.murderer take "models/weapons/p38.tik"
+			local.murderer take "models/weapons/m1_garand.tik"
+			local.murderer take "models/weapons/kar98.tik"
+			local.murderer take "models/weapons/KAR98_sniper.tik"
+			local.murderer take "models/weapons/springfield.tik"
+			local.murderer take "models/weapons/thompsonsmg.tik"
+			local.murderer take "models/weapons/mp40.tik"
+			local.murderer take "models/weapons/bar.tik"
+			local.murderer take "models/weapons/mp44.tik"
+			local.murderer take "models/weapons/bazooka.tik"
+			local.murderer take "models/weapons/shotgun.tik"
+			local.murderer take "models/weapons/panzerschreck.tik"
+			local.murderer take "models/weapons/m2frag_grenade.tik"
+			local.murderer take "models/weapons/steilhandgranate.tik"
+			// Spearhead code doesn't work anyway, stick to AA
+			/*if (int(getcvar(shortversion)) > 1)
+			{
+				local.murderer take "models/weapons/enfield.tik"
+				local.murderer take "models/weapons/FG42.tik"
+				local.murderer take "models/weapons/G43.tik"
+				local.murderer take "models/weapons/M18_smoke_grenade.tik"
+				local.murderer take "models/weapons/mills_grenade.tik"
+				local.murderer take "models/weapons/Mosin_Nagant_Rifle.tik"
+				local.murderer take "models/weapons/Nagant_revolver.tik"
+				local.murderer take "models/weapons/nebelhandgranate.tik"
+				local.murderer take "models/weapons/ppsh_smg.tik"
+				local.murderer take "models/weapons/RDG-1_Smoke_grenade.tik"
+				local.murderer take "models/weapons/Russian_F1_grenade.tik"
+				local.murderer take "models/weapons/sten.tik"
+				local.murderer take "models/weapons/svt_rifle.tik"
+				local.murderer take "models/weapons/Webley_Revolver.tik"
+			}*/
+			/*if (level.sh_ingame == 0)
+				waitframe*/
+			if (level.time >= local.murderer.sh_murdererexpiry)
+			{
+				local.timelimithit = 1
+				break
+			}
+			
+			waitframe
+		}
+		local.murderer.sh_hidden = 0
+		local.murderer show
+		local.murderer lightOff
+		if (local.timelimithit)
+			iprintlnbold_noloc "The Murderer's rampage has ended - he hit his time limit!"
+		else
+			iprintlnbold_noloc "The Murderer has been killed!"
+		local.murderer.sh_done = 0
+		local.murderer.sh_ingame = 0
+		huddraw_alpha 106 0
+		huddraw_alpha 107 0
+		while (!isAlive(local.murderer))
+			waitframe
+		while (local.murderer.dmteam != allies) {
+			local.murderer join_team allies
+			local.murderer respawn
+			waitframe
+		}
+		local.murderer respawn
+		level.sh_murderer = NIL
+		//goto select_murderer
+	//}
+end
+
+updatetimes:
+	local.str = ""
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		if ($player[local.i].sh_times)
+		local.str = local.str + string($player[local.i].entnum) + ":" + string($player[local.i].sh_times) + " "
+	}
+	game.sh_murderers = local.str
+end
+
+gobackallies:
+/*	self takeall
+	self hide
+	self notsolid
+	self physics_off
+	self dog // prevent them from selfkilling or they'll mess the whole thing up
+	self.sh_ingame = 0 // so that the player thinker ignores them
+	self iprint "You really shouldn't have tried to join the axis." 1
+	self iprint "Now you have to wait to join back the allies." 1
+	wait 20
+	self dog
+	self.sh_ingame = 1
+	self join_team allies
+	self iprint "Now, please do stay on the allied team!" 1
+	self respawn*/
+	self spectator
+	waitframe
+	self join_team allies
+	self respawn
+	self iprint "Please stay on the allied team!" 1
+end
+
+sounds:
+	while (1) {
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if ($player[local.i].sh_ingame && level.time >= $player[local.i].sh_soundtime) {
+				if (randomint(100) < 25)
+					$player[local.i] thread sounds_footsteps
+				else
+					$player[local.i] thread sounds_random
+				$player[local.i].sh_soundtime = level.time + 15.0 + randomfloat(15)
+			}
+		}
+		waitframe
+	}
+end
+
+sounds_footsteps:
+	local.steps = 1 + randomint(4)
+	local.v = ( 0 self.viewangles[1] 0 )
+	if (randomint(100) < 50)
+		local.v[1] -= 90.0 + randomfloat(90)
+	else
+		local.v[1] += 90.0 + randomfloat(90)
+	local.v = self.origin + (angles_toforward local.v) * (256 + randomint(256))
+	local.ent = spawn script_origin origin local.v
+	if (randomint(100) < 50)
+		local.snd = "snd_step_stone"
+	else
+		local.snd = "snd_step_wood"
+	for (local.i = 1; local.i <= local.steps; local.i++) {
+		local.ent playsound local.snd
+		wait 0.4
+	}
+	local.ent delete
+end
+
+sounds_random:
+	local.v = ( 0 self.viewangles[1] 0 )
+	if (randomint(100) < 50)
+		local.v[1] -= 90.0 + randomfloat(90)
+	else
+		local.v[1] += 90.0 + randomfloat(90)
+	local.v = self.origin + (angles_toforward local.v) * (256 + randomint(512))
+	local.ent = spawn script_origin origin local.v
+	local.ent playsound creepy wait
+	local.ent waittill sounddone
+	local.ent delete
+end

@@ -1,0 +1,28 @@
+pow local.num local.power:
+	local.n = local.num
+	while (local.power > 1) {
+		local.n = local.n * local.num
+		local.power--
+	}
+end local.n
+
+inthex local.num:
+	local.digits = "0123456789abcdef"
+	local.hex = ""
+	for (local.i = 7; local.i >= 0; local.i--) {
+		local.hdpow = waitthread pow 16 local.i
+		local.hex = local.hex + local.digits[(local.num & (15 * local.hdpow)) / local.hdpow]
+	}
+end local.hex
+
+strncpy local.dst local.dstofs local.src local.srcofs local.len:
+	if (local.dstofs == NIL || local.dstofs == NULL)
+		local.dstofs = 0
+	if (local.srcofs == NIL || local.srcofs == NULL)
+		local.srcofs = 0
+	for (local.i = 0; local.i < local.len; local.i++) {
+		local.dst[local.dstofs] = local.src[local.srcofs]
+		local.srcofs++
+		local.dstofs++
+	}
+end local.dst

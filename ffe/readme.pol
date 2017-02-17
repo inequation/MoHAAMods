@@ -1,0 +1,86 @@
+Plik            : Fire-For-Effect!
+Autor           : Rookie One
+Wersja          : 0.8
+Data            : 02.04.2005
+
+Opis            :
+Ten mod dodaje wsparcie ogniowe w stylu Wolfensteina: Enemy Territory-style do MoHAA! :) Wyceluj gdzieœ lornetk¹ i kliknij albo rzuæ granatem dymnym (Steilhandgranate)... i znajdŸ jak¹œ dobr¹ os³onê! :P
+
+***OSRZEZENIE***
+Ta modyfikacja u¿ywa niestandardowego skryptu DMprecache.scr i pliku stanu torsu. Jeœli u¿ywasz jakiegokolwiek innego moda, który te¿ u¿ywa niestandardowych wersji tych plików (np. DMz DogTag, Snake's Server Patch czy AntiCamper {sfx}), bêdziesz musia³(a) zmodyfikowaæ te pliki, aby te mody mog³y dzia³aæ równoczeœnie. To jest ***KONIECZNE***, by mod dzia³a³ prawid³owo.
+
+W³o¿y³em du¿o pracy w ten mod by by³ jak najbardziej "znoœny" dla serwera, ale i tak nie mogê zagwarantowaæ, ¿e nie spowoduje on zawieszenia serwera. Domyœlna konfiguracja jest optymalna. Testowy serwer wytrzyma³ 48-godzinn¹ sesjê próby obci¹¿eniowej bez zawieszenia czy nawet zauwa¿alnego spadku wydajnoœci, a wiêc jest du¿a szansa, ze nie napotkasz ¿adnych problemów dopóki nie wprowadzisz radykalnych zmian do konfiguracji moda.
+
+Jeszcze jedno - w odpowiedzi na kilka e-maili, które dosta³em, ta modyfikacja dzia³a ***tylko z Medal of Honor Allied Assault, dodatki Spearhead i Breakthrough ***nie s¹ wspierane***.
+***OSTRZEZENIE***
+
+Zosta³eœ(aœ) ostrze¿ony. Nie biorê na siebie ¿adnej odpowiedzialnoœci za efekty zainstalowania moda na twoim serwerze.
+
+Od tej wersji nie ma ju¿ potrzeby modyfikowania skryptu mapy, chyba ¿e posiada ona niestandardowy skybox albo nie pokrywa on ca³ej mapy (np. tak, jak w Algierze czy V2 Rocket Facility) - w tych przypadkach bêdziesz potrzebowa³(a) skryptu predefiniowanych ustawieñ. Przeczytaj plik tutorial.txt by dowiedzieæ siê, jak to zrobiæ.
+
+Ustawienia moda s¹ odczytywane z pliku ffe_settings.txt. Jest ***KONIECZNYM*** by plik ten znajdowa³ siê w katalogu MoHAA/main! Jest te¿ polska wersja pliku - ffe_settings.pol. Zmieñ jego nazwê na ffe_settings.txt by wszystkie komunikaty moda wyœwietlane by³y po polsku.
+
+Instalacja      :
+Po prostu skopiuj plik .pk3 ORAZ plik konfiguracyjny (ffe_settings.txt) do Twojego katalogu MoHAA/main. Mo¿esz zmieniæ konfiguracjê moda edytuj¹c ten plik.
+
+Historia wersji :
+0.8
+ o poprawiono b³¹d, który powodowa³, ¿e instrukcje nie pojawia³y siê a¿ do restartu mapy (dziêki dla SuperTanka.17 za wykrycie),
+ o poprawiono b³¹d w metodzie trasowania xzones, który nie pozwala³ nigdzie zamawiaæ wsparcia (jeszcze raz dziêki dla SuperTanka.17 za wykrycie),
+ o zoptymalizowano metodê trasowania zones by zmniejszyæ obci¹¿enie serwera,
+ o teraz do wykrywania klikniêæ lornetk¹ u¿ywany jest niestandardowy plik stanów - modyfikowanie skryptów map nie jest ju¿ potrzebne,
+ o dodano parê "z" do nazwy .pk3 by upewniæ siê, ¿e FFE zastêpuje Stielhandgranaten w zwi¹zku z czêstym narzekaniem, ¿e granaty dymne nie dzia³aj¹,
+ o poniewa¿ nalot z 3 wybuchami jednak nie pasowa³ za bardzo do ET, mo¿esz teraz wybraæ 6- lub 3-wybuchowy nalot za pomoca pliku konfiguracyjnego - ustaw to tak, jak chcesz,
+ o poprawiono b³¹d powoduj¹cy, ¿e eksplozje z nalotów pojawia³y siê na ( 0 0 0 ) w przypadku, gdy mia³y pojawiæ siê poza map¹ - teraz nie pojawiaj¹ siê w ogóle,
+ o usuniêto opcjê wy³¹czania modu przez konsolê poniewa¿ nie dzia³a³a zbyt dobrze,
+ o reorganizacja kodu.
+
+0.7
+ o zmniejszono mno¿nik odrzutu eksplozji poniewa¿ cia³a fruwa³y po ca³ej mapie, :P
+ o poprawiono b³¹d w procedurze ³adowania predefiniowanych ustawieñ który powodowa³, ¿e nazwa mapy by³a odczytywana jako "getcvar",
+ o teraz s¹ 3 eksplozje w nalocie zamiast 6, s¹ za to OGROMNE, :) co œwietnie rekompensuje ich ma³¹ liczbê; wiêksze podobieñstwo do WolfET; tak¿e poprawia prêdkoœæ dzia³ania,
+ o znacznik artylerii ju¿ ciê nie zabije - teraz zadaje losowe obra¿enia od 15 do 25; wiêksze podobieñstwo do WolfET,
+ o poprawiona procedura zadawania obra¿eñ - przyspiesza dzia³anie gry.
+
+0.6
+ o usuniêto nieu¿ywany kod,
+ o poprawiono obs³ugê graczy - poprzednia wersja mog³a w skrajnych przypadkach powodowaæ zawieszenie serwera, jeœli wielu graczy od³¹czy³oby siê od serwera, gdy s¹ w trybie obserwatora b¹dŸ martwi,
+ o ³adowanie predefiniowanych ustawienia dla map nie rozró¿nia teraz wielkich i ma³ych liter, wiêc bêd¹ one ³adowane nawet, jeœli cvar mapname nie jest ustawiony ma³ymi literami,
+ o wskaŸnik bólu pokazuje ju¿ w³aœciwy kierunek przy eksplozjach.
+
+0.5
+ o poprawiono b³¹d licznika mocy daj¹cy pe³n¹ moc zaraz po wezwaniu nalotu,
+ o da³em sobie spokój z próbowami udawania s³abszej eksplozji granatu... :(
+
+0.4
+Tym razem mamy d³ug¹ listê poprawek:
+ o przed sprawdzeniem widocznoœci przy eksplozji wykonywane jest sprawdzenie odleg³oœci by zaoszczêdziæ zasoby systemowe serwera,
+ o poprawiono b³¹d pozwalaj¹cy na nieskoñczon¹ iloœæ nalotów,
+ o wiêkszoœæ script_originów nie jest ju¿ wysy³ana do serwerów by zaoszczêdziæ przepustowoœæ ³¹cza,
+ o usuniêto efekt ognia z eksplozji - powodowa³ ogromne spadki FPS i lagi,
+ o zmniejszono iloœæ "generatorów dymu" - z¿era³y przepustowoœæ ³¹cza,
+ o mo¿esz teraz wy³¹czyæ skrypt u¿ywaj¹c cvara ffe_shutdown,
+ o Niemcy nie zostaj¹ ju¿ z 1 granatem przeciwko 6 aliantów (albo 3, jeœli jest zainstalowany realizm) na mapach nie obs³uguj¹cych FFE,
+ o poprawiono b³¹d wypisuj¹cy NIL na ekranie gracza, który rzuci³ granat dymny i zaraz potem przeszed³ w tryb obserwatora,
+ o zmieniono komunikat "niewystarczaj¹ce wsparcie ogniowe" dla wsparcia powietrznego na "zbyt wiele wezwañ",
+ o usprawniono obs³ugiwanie granatów.
+ o nowy, ³adniejszy komunikat z instrukcjami. :)
+
+0.3
+Du¿o zmian, wiêkszoœci nie pamiêtam. :P Ale to, co pamiêtam: poprawiono bugi metod zones i xzones, zwiêkszono dystans eksplozji bomb wsparcia lotniczego.
+
+0.2
+Dodano zamawianie nalotów bombowych za pomoc¹ granatów dymnych (dziêki dla Elgana za sugestiê, by u¿yæ parm.owner!), zmieniono system liczników.
+
+0.1
+Pierwsza wersja.
+
+Kontakt         :
+e-mail          : rookie_one@army.com
+Gadu-Gadu       : 2134786
+Jabber          : r00kie_0ne@chrome.pl
+Tlen            : rookie_one@tlen.pl
+
+--------------------------------------------------------------------
+
+Ten mod nie mo¿e byæ modyfikowany bez mojego pozwolenia.

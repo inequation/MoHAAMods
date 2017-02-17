@@ -1,0 +1,43 @@
+// Fire-For-Effect! Modification
+// Written by Rookie One
+// configuration file
+
+// Ustala co ile sekund bêd¹ pojawiaæ siê instrukcje
+local.settings["instruction_frequency"] = 120
+
+// Pozwoliæ graczom na wzywanie artylerii? 1 = tak, 0 = nie
+local.settings["artillery"] = 1
+
+// Pozwoliæ graczom na wzywanie nalotów? 0 = nie, 1 = tradycyjny nalot z 6 eksplozjami, 2 = nalot z 3 ogromnymi eksplozjami
+local.settings["airstrike"] = 1
+
+// Iloœæ ostrza³ów artyleryjskich/nalotów jak¹ naraz mo¿e zamówiæ dru¿yna
+local.settings["firemissions"] = 4
+
+// Czas licznika wsparcia ogniowego
+local.settings["firemissiontimer"] = 40
+
+// OpóŸnienie licznika wsparcia ogniowego (pocz¹tkowa wartoœæ licznika ustalana jest odejmuj¹c t¹ wartoœæ od czasu licznika wsparcia ogniowego)
+local.settings["firemissiontimerdelay"] = 20
+
+end local.settings
+
+localize:
+	// Linie poni¿ej u¿ywane s¹ do t³umaczenia
+	local.ized["Use your binoculars to call artillery support (aim somewhere and click fire)."] = "Uzyj lornetki by wezwac wsparcie artyleryjskie (wyceluj i nacisnij spust)."
+	local.ized["Use smoke grenades (Stielhandgranaten) to call airstrikes."] = "Uzyj granatow dymnych (Stielhandgranaten) by wezwac wsparcie powietrzne."
+	local.ized["One fire mission can be called each "] = "Wsparcie ogniowe moze byc wezwane raz na "
+	local.ized[" seconds."] = " sekund."
+	local.ized["ARTILLERY SUPPORT: Cannot see target!"] = "WSPARCIE ARTYLERYJSKIE: Nie widze celu!"
+	local.ized["ARTILLERY SUPPORT: Firing for effect!"] = "WSPARCIE ARTYLERYJSKIE: Rozpoczynamy ostrzal!"
+	local.ized["ARTILLERY SUPPORT: Insufficient fire support! Next fire mission available in "] = "WSPARCIE ARTYLERYJSKIE: Nie jestesmy gotowi! Nastepny ostrzal mozliwy za "
+	local.ized[" seconds!"] = " sekund!"
+	local.ized["AIR SUPPORT: Aborting, cannot see target!"] = "WSPARCIE POWIETRZNE: Odmawiam, nie widze celu!"
+	local.ized["AIR SUPPORT: Affirmative! On my way!"] = "WSPARCIE POWIETRZNE: Przyjalem! Jestem w drodze!"
+	local.ized["AIR SUPPORT: Too many airstrikes requested! Next fire mission available in "] = "WSPARCIE POWIETRZNE: Zbyt wiele wezwan! Nastepny nalot mozliwy za "
+	//local.ized[" seconds!"] = " sekund!"
+	local.ized["Not enough power to call fire support! Charging will take "] = "Za malo mocy by wezwac wsparcie ogniowe! Ladowanie potrwa "
+	local.ized[" more seconds!"] = " sekund!"
+	local.ized["Charging complete!"] = "Ladowanie zakonczone!"
+	local.ized["Fire-For-Effect has been shut down!"] = "Fire-For-Effect zostal wylaczony!"
+end local.ized

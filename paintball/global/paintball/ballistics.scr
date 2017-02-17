@@ -1,0 +1,153 @@
+// script for running custom physics on paintballs
+// this includes deviation, drag and gravity
+
+main:
+	if (self.pb_ballistics)
+		end
+	//iprintlnbold_noloc "RUNNING BALLISTICS"
+	self.pb_ballistics = 1
+
+	// wait a frame, projectile isn't actually initialized yet
+	waitframe
+	// early out if we've exploded already
+	if (!self)
+		end
+	// obtain movement direction and speed
+	local.speed = vector_length self.velocity
+	// early out if we've stopped already	
+	if (local.speed <= 0.0)
+		end
+	local.dir = vector_normalize self.velocity
+
+	// create two perpendicular vectors
+	local.rightup = waitthread make_normal_vectors local.dir
+
+	// apply spread, also kick the ball up a bit
+	/*local.jitter = (randomfloat(550.0) - 275.0) * local.rightup[0]
+	local.jitter += (randomfloat(350.0) - 175.0) * local.rightup[1]*/
+	local.jitter = (randomfloat(250.0) - 125.0) * local.rightup[0]
+	local.jitter += (randomfloat(150.0) - 75.0) * local.rightup[1]
+	local.jitter[2] += 125
+	//iprintlnbold_noloc "jitter: " local.jitter
+	
+	// cap speed and apply new velocity
+	local.dir = vector_normalize (self.velocity + local.jitter)
+	self.velocity = local.dir * local.speed
+
+	local.start = self.origin
+	local.lastorg = local.start
+	local.launch = level.time
+
+	local.bounce = 0
+
+	// come up with some random wind
+	local.wind = (angles_toforward ( (randomint(30) - 15) (randomint(360)) 0 )) * randomint(500)
+
+	// now apply drag as we go through the air
+	while (self) {
+		local.dir = vector_normalize self.velocity
+		// convert speed to metres per second
+		local.speed = (vector_length self.velocity) * 0.3048 * 0.0625
+		// once we're under 45m/s, we no longer splat and bounce instead
+		if (!local.bounce && local.speed < 45.0) {
+			local.bounce = 1
+			self bouncetouch
+			self hitdamage 0
+			self explosionmodel models/fx/paintballdummy.tik
+			//iprintlnbold_noloc "SWITCHING TO BOUNCE"
+		}
+		// Fd = -1/2 * d * v^2 * A * Cx
+		// Fd - drag force
+		// d - fluid density; 1.2kg/m^3 for air
+		// v - object velocity
+		// A - object surface area "working" against the fluid; pi * r^2
+		// Cx - drag coefficient; ~0.45 for a sphere
+		// average paintball mass is 3.2g = 0.0032kg -> 1/m = 312.5
+		// average paintball radius is ~1cm = 0.01m
+		// a = F/m
+		// From the equation above we can conclude that the drag force is only dependent on
+		// velocity, all the other values are constant, which makes it possible to simplify
+		// the acceleration equation to:
+		// ad = C * v^2
+		// Where C is a product of all the constants. When using real values, we get a C of
+		// -0.026507165625, but it doesn't feel right, so we're using a hand-tuned value.
+		local.acc = local.dir * (local.speed * local.speed * -0.023) // constants multiplied
+		// add gravity to the fray...
+		local.acc[2] -= 9.81
+		// ...and the wind, too
+		local.sine = waitthread sin ((level.time - local.launch) * 4.0)
+		local.acc += local.wind * 0.05 * local.sine * local.sine
+		// apply acceleration, converting back to quake units in the process
+		//self.velocity = self.velocity + (local.dir * local.acc * 0.05 * 16 * 3.28)
+		self.velocity = self.velocity + (local.acc * 2.624) // constants multiplied
+
+		local.lastorg = self.origin
+
+		waitframe
+	}
+	//iprintlnbold_noloc "range: " (vector_length (local.lastorg - local.start) * 0.0625) "ft, speed: " (local.speed * 3.28) "ft/s, time: " (level.time - local.launch) "s"
+end
+
+make_normal_vectors local.vec:
+	// this rotate and negate guarantees a vector not colinear with the original
+	local.arr[0] = ( local.vec[2] -local.vec[0] local.vec[1] )
+
+	local.d = vector_dot local.arr[0] local.vec
+	local.arr[0] += (local.vec * local.d * -1.0)
+	local.arr[0] = vector_normalize local.arr[0]
+	local.arr[1] = vector_cross local.arr[0] local.vec
+
+	// make sure the order is right
+	if (abs(local.arr[1][2]) < abs(local.arr[0][2])) {
+		local.temp = local.arr[0]
+		local.arr[0] = local.arr[1]
+		local.arr[1] = local.temp
+	}
+end local.arr
+
+// Let's call this the "Godlewski sine approximation" in my own honour. :P
+// It's not exactly a sine, but it's close enough for us and MUCH faster than a Taylor expansion implementation
+// since it only performs 1 multiplication and some additions/subtractions (number of which is proportional to
+// the magnitude of input value) during value normalization, and 2 multiplications and 3 additions/subtractions
+// during the actual output computation. Also, it doesn't have the memory cost of a lookup table.
+// Basically it works like this: we have 2 quadratic equations whose plots together look very much like a sine
+// wave:
+// y = -4(x - 0.5)^2 + 1 for x that belongs to [0..1]
+// y = 4(x - 1.5)^2 - 1 for x that belongs to [1..2]
+// We normalize the input to fall in the [0..2] range and apply one of the equations accordingly.
+// The magnitude of error ranges from 0 to about 0.06, which is unnoticeable in the vast majority of cases.
+// However, if further precision is required, the error can be reduced by several orders of magnitude down to
+// a negligible value, as it can be approximated quite accurately with a 3rd degree polynomial.
+sin local.x:
+	// normalize the input
+	//local.x = local.x / 3.14159265358979323846
+	local.x = local.x * 0.31830988618379067154	// 1/pi, because multiplication is faster than division
+	// calculate the value relative to period
+	local.x = (local.x / 2.0) - (int(local.x / 2))
+	if (local.x < 0.0)
+		local.x += 2.0
+	goto _sin_normalized	// moved to a separate label so that this part of the code can be shared between sin and cos
+end
+
+_sin_normalized:
+	// fast special case
+	if (local.x == 0.0 || local.x == 1.0 || local.x == 2.0)
+		end 0.0
+	// pick range and calculate result
+	if (local.x < 1) {
+		local.x -= 0.5
+		end ( -4.0 * local.x * local.x + 1.0)
+	}
+	local.x -= 1.5
+end (4.0 * local.x * local.x - 1.0)
+
+// A cosine approximation that uses the same principle:
+cos local.x:
+	// normalize the input
+	local.x = 0.5 + local.x * 0.31830988618379067154	// move the plot by a half to the left to achieve cosine
+	// calculate the value relative to period
+	local.x = (local.x / 2.0) - (int(local.x / 2))
+	if (local.x < 0.0)
+		local.x += 2.0
+	goto _sin_normalized	// moved to a separate label so that this part of the code can be shared between sin and cos
+end

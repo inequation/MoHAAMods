@@ -1,0 +1,397 @@
+// Landmine script
+// Written by Rookie One
+
+main local.action:
+	switch (local.action)
+	{
+		case "raise_binoculars":
+			self.ca_binoculars = 1
+			self thread mine_detection
+			break
+		case "weapon_putaway":
+			self.ca_binoculars = 0
+			break
+		case "dead":
+			self.ca_power = 0
+			self.ca_done = 0
+			self.ca_haslandmine = 0
+			break
+		default:
+			level waittill prespawn
+			cache models/static/equipment/german_rations_1.tik
+			thread player_watcher
+			thread grenade_catch_net
+			if (int(getcvar(g_gametype)) > 1)
+			{
+				level.ca_landminenum[allies] = 0
+				level.ca_landminenum[axis] = 0
+			}
+			else
+				level.ca_landmines[freeforall] = 0
+			if ($world.farplane == NIL)
+			{
+				level.ca_sight_max = 22000
+			}
+			else
+			{
+				if ($world.farplane < 1)
+				{
+					level.ca_sight_max = 22000
+				}
+				else
+				{
+					level.ca_sight_max = $world.farplane
+				}
+			}
+	}
+end
+
+player_watcher:
+	level waittill spawn
+	println "[FIRE-FOR-EFFECT]: Starting the player watcher"
+	while (1)
+	{
+		for (local.i = 1; local.i <= $player.size; local.i++)
+		{
+			if (isAlive($player[local.i]) && $player[local.i].dmteam != spectator && $player[local.i].done != 1)
+			{
+				$player[local.i].ca_done = 1
+				$player[local.i] thread equip_at_join
+			}
+		}
+		waitframe
+	}
+end
+
+equip_at_join:
+	local.trg = spawn trigger_multiple origin self.origin
+	local.trg glue self
+	local.trg.player = self
+	local.trg setthread global/landmines/root.scr::player_join_trigger
+	while (self != NIL && self != NULL && local.trg != NIL && local.trg != NULL)
+		waitframe
+	if (local.trg != NIL && local.trg != NULL)
+		local.trg delete
+end
+
+player_join_trigger:
+	if (parm.other == self.player)
+	{
+		self.player item items/binoculars.tik
+		self.player take weapons/steilhandgranate.tik
+		self.player take weapons/m2frag_grenade.tik
+		waitframe
+		self.player item weapons/m2frag_grenade.tik
+		//self.player thread reset_at_death
+//		if ((level.ffe_artillery == 1 && level.ffe_settings["artillery"] == 1) || (level.ffe_airstrike == 1 && level.ffe_settings["airstrike"] == 1))
+			self.player thread power_timer
+		self delete
+	}
+end
+
+reset_at_death:
+	if (self.dmteam != spectator)
+	{
+		local.team = self.dmteam
+		while (isAlive(self) && self.dmteam == local.team)
+			waitframe
+	}
+	self.ca_done = 0
+	self.ca_power = 0
+end
+
+power_timer:
+	//self.ca_power_timer = float(20) //level.ffe_settings["firemissiontimer"] - level.ffe_settings["firemissiontimerdelay"]
+	self.ca_power = float(50)
+	local.step = float(100 / 40)
+	while (isAlive(self) && self.dmteam != spectator)
+	{
+		if (self.ca_power < 100)
+		{
+			if (self.ca_power == 0 || self.ca_power == 25 || self.ca_power = 50 || self.ca_power == 75 || self.ca_power == 100)
+				self iprint ("Charging status: " + self.ca_power + "%")//(level.ca_localization["Charging status: "] + self.ca_power + "%")
+			if (self.ca_power == 50)
+			{
+				self item weapons/steilhandgranate.tik
+				self.ca_haslandmine = 1
+//				self.haspower = 1
+//				self.power_timer = 0
+//				self iprint (level.ffe_localization["Charging complete!"])
+			}
+			self.ca_power += local.step
+		}
+		if (self.ca_power == 100)
+		{
+			if (self.ca_haslandmine == 1)
+				self ammo agrenade 1
+		}
+		wait 1
+	}
+end
+
+grenade_catch_net:
+	local.trg = spawn trigger_multipleall spawnflags 20 origin ( 0 0 0 )
+	local.trg setsize ( -16384 -16384 -16384 ) ( 16384 16384 16384 )
+	local.trg setthread projectile_trigger_fire
+end
+
+smokegrenade_trigger_fire:
+	local.projectile = parm.other
+	local.projectile.player = parm.owner
+	if (local.projectile.ca_done != 1)
+	{
+		local.projectile.ca_done = 1
+		if (local.projectile.model == models/projectiles/steilhandgranate.tik || local.projectile.model == models/projectiles/steilhandgranate_primary.tik)
+		{
+			local.player.ca_power = 0.0
+			//local.player.power_timer = 0
+//			if (level.ffe_airstrike == 1 && level.ffe_settings["airstrike"] == 1)
+				local.projectile thread landmine_fire //local.player
+			local.projectile thread landmine_swap
+		}
+	}
+end
+
+landmine_swap:
+	if (self.ca_fakemodel == NIL || self.ca_fakemodel == NULL)
+	{
+		self.ca_fakemodel == spawn script_model model models/static/german_rations_1.tik
+		self.ca_fakemodel notsolid
+//		self.ca_fakemodel.projectile = self
+		self.ca_fakemodel thread glue_while_alive self
+		self.ca_fakemodel thread remove_after 30
+	}
+end
+
+glue_while_alive local.ent:
+	while (isAlive(local.ent) && local.ent != NIL && local.ent != NULL)
+	{
+		self.origin = local.ent.origin
+		waitframe
+	}
+	self.origin = trace (self.origin + ( 0 0 8 )) (self.origin + ( 0 0 -16384 ))
+end
+
+remove_after local.time:
+	wait local.time
+	if (self.trigger != NIL && self.trigger != NULL)
+		self.trigger delete
+	if (self != NIL && self != NULL)
+		self delete
+end
+
+landmine_fire:
+	if (self.player.dmteam == spectator)
+		end
+	if (int(getcvar(g_gametype)) > 1)
+		local.team = self.player.dmteam
+	else
+		local.team = freeforall
+	if (level.ca_landminenum[local.team] >= 10)
+	{
+		self.player iprint "Your team has too many landmines planted." 1
+		self.player ammo agrenade 1
+		self.ca_fakemodel delete
+		self delete
+		end
+	}
+	self.ca_fakemodel.trigger = spawn trigger_use origin self.ca_fakemodel.origin
+	self.ca_fakemodel.trigger setsize ( -64 -64 0 ) ( 64 64 64 )
+	self.ca_fakemodel.trigger.landmine = self.ca_fakemodel
+	self.ca_fakemodel.trigger setthread landmine_arm
+end
+
+landmine_arm:
+	local.player = parm.other
+	local.counter = 0.0
+	while (isAlive local.player && (local.player cansee self 30 48) && local.player.useheld == 1 && self != NIL && self != NULL)
+	{
+		if (local.counter == 0.0)
+			local.player stopwatch 3
+		wait .1
+		local.counter += 0.1
+		if (local.counter >= 3)
+		{
+			local.player iprint "Landmine armed!" 1
+			if (int(getcvar(g_gametype)) > 1)
+				local.team = self.player.dmteam
+			else
+				local.team = freeforall
+			level.ca_landminenum[local.team]++
+			self.landmine.origin = (self.landmine.origin + ( 0 0 -8 ))
+			self.landmine.player = local.player
+			self.landmine hide
+			self.landmine thread landmine_handler
+			if (level.ca_landmines == NIL || level.ca_landmines == NULL)
+				level.ca_landmines[1] = self.landmine
+			else
+			{
+				level.ca_landmines = waitthread compress_array level.ca_landmines
+				local.index = level.cv_deadbodies.size + 1
+				level.ca_landmines[local.index] = self.landmine
+			}
+		}
+	}
+	if (local.counter > 0)
+		local.player stopwatch 0
+end
+
+landmine_handler:
+	local.team = self.player.dmteam
+	self.trigger delete
+	wait 3
+	if (self.player == NIL || self.player == NULL || self.player.dmteam != local.team)
+	{
+		self delete
+		end
+	}
+	self.trigger = spawn trigger_multiple origin (self.origin + ( -8 0 0 ))
+	self.trigger setsize ( -8 -8 0 ) ( 0 8 16 )
+	self.trigger.landmine = self
+	self.trigger setthread landmine_step
+	while (self.player != NIL && self.player != NULL && self.player.dmteam == local.team)
+		waitframe
+	self.trigger delete
+	self delete
+end
+
+landmine_step:
+	local.sucker = parm.other
+	if (int(getcvar(g_gametype)) > 1)
+		local.team = self.landmine.player.dmteam
+	else
+		local.team = freeforall
+	level.ca_landminenum[local.team]--
+	//self nottriggerable
+	local.team = local.sucker.dmteam
+	self playsound mine_trigger
+	self playsound m1l2b_disabletruck
+	self.landmine show
+	local.smoke = spawn models/emitters/linger_smoke.tik origin self.origin
+	local.smoke thread landmine_smoke
+	while (local.sucker isTouching self && local.sucker != NIL && local.sucker != NULL)
+		waitframe
+	local.boom = spawn models/animate/fx_mortar_dirt.tik scale 0.39 origin self.origin
+	local.boom anim start
+	thread scored_radiusdamage self.origin self.player 256 256
+	wait 1
+	local.boom delete
+end
+
+landmine_smoke:
+	self anim start
+	wait 2
+	self delete
+end
+
+scored_radiusdamage local.org local.caller local.dmg local.radius:
+	local.ent = waitthread spawn_nobroadcast script_origin (local.org + ( 0 0 8 ))
+	for (local.i = 1; local.i <= $player.size; local.i++)
+	{
+		if (vector_within local.ent.origin $player[local.i].origin (local.radius + 1) && isAlive($player[local.i]) && $player[local.i].dmteam != spectator)
+		{
+			if (local.ent cansee $player[local.i] 360 local.radius)
+				$player[local.i] damage local.caller local.dmg local.caller ( 0 0 0 ) ((angles_toforward(angles_pointat local.ent local.ent $player[local.i])) * -1) ( 0 0 0 ) local.dmg 0 9 -1
+		}
+	}
+	radiusdamage local.ent.origin local.dmg local.radius
+	local.ent delete
+end
+
+spawn_nobroadcast local.entityclassname local.origin:
+	local.ent = spawn local.entityclassname origin local.origin
+	local.ent svflags "-broadcast"
+end local.ent
+
+spawn_nobroadcast local.entityclassname local.origin:
+	local.ent = spawn local.entityclassname origin local.origin
+	local.ent svflags "+broadcast"
+end local.ent
+
+mine_detection:
+	local.team = self.dmteam
+	while (self.ca_binoculars == 1 && isAlive(self) && self.dmteam == local.team && self != NIL && self != NULL)
+	{
+		if (self.useheld == 1)
+		{
+			self.ca_sweeping = 1
+			local.ent = waitthread spawn_nobroadcast script_origin origin ((trace ((self gettagposition "Bip01 Head") + (angles_toforward self.viewangles) * 64) ((self gettagposition "Bip01 Head") + (angles_toforward self.viewangles) * level.ca_sight_max)) + ( 0 0 8 ))
+			while (self.ca_binoculars == 1 && isAlive(self) && self.dmteam == local.team && self != NIL && self != NULL && self.useheld == 1)
+			{
+				for (local.i = 1; local.i <= level.ca_landmines.size; local.i++)
+				{
+					if (vector_within local.ent.origin level.ca_landmines[local.i] 53 && level.ca_landmines[local.i].sweeped != 1)
+					{
+						if (local.ent cansee level.ca_landmines[local.i] 360 52)
+						{
+							if (level.ca_landmines[local.i].noticetime == NIL || level.ca_landmines[local.i].sweeptime == NULL)
+							{
+								level.ca_landmines[local.i].sweeptime = 0.0
+								level.ca_landmines[local.i] thread mine_sweeping
+							}
+							level.ca_landmines[local.i].sweeptime += 0.1
+							if (level.ca_landmines[local.i].sweeptime == 5)
+								level.ca_landmines[local.i] thread mine_sweeped self
+						}
+					}
+				}
+				wait .1
+			}
+			local.ent delete
+		}
+		waitframe
+	}
+	self.ca_binoculars = 0
+end
+
+compress_array local.array:
+	local.newarray[1] = NIL
+	local.j = 1
+	for (local.i = 1; local.i <= local.array.size; local.i++)
+	{
+		if (local.array[local.i] != NIL && local.array[local.i] != NULL)
+		{
+			local.newarray[local.j] = local.array[local.i]
+			local.j++
+		}
+	}
+end local.newarray
+
+mine_sweeping:
+	self.beam = waitthread spawn_broadcast func_beam (self.origin + ( 0 0 8 ))
+	self.beam endpoint (self.origin + ( 0 0 16 ))
+	self.beam maxoffset 0
+	self.beam minoffset 0
+	self.beam.scale = 6
+	self.beam shader ("textures/hud/" + self.player.dmtea)
+	self.beam numsegments 1
+	self.beam activate
+	waitframe
+	while (self != NIL && self != NULL && self.beam != NIL && self.beam != NULL && self.sweeptime < 5)
+	{
+		local.time = self.sweeptime
+		wait 0.1
+		if (self.sweeptime = local.time)
+		{
+			self.beam delete
+			self.sweeptime = 0.0
+		}
+	}
+end
+
+mine_sweeped local.sweeper:
+	if (self.beam == NIL || self.beam == NULL)
+	{
+		self.beam = waitthread spawn_broadcast func_beam (self.origin + ( 0 0 8 ))
+		self.beam endpoint (self.origin + ( 0 0 16 ))
+		self.beam maxoffset 0
+		self.beam minoffset 0
+		self.beam.scale = 6
+		self.beam shader ("textures/hud/" + self.player.dmteam)
+		self.beam numsegments 1
+		self.beam activate
+	}
+	local.sweeper iprint "You have spotted a landmine!" 1
+	local.sweeper dmmessage -1 "Landmine spotted!"
+	//local.sweeper playsound streamed_dfr_scripted_M3L1_096a
+end

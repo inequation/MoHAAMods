@@ -1,0 +1,4 @@
+// This is a simple hack that allows calling artillery through the state file
+main:
+		self thread global/fire_for_effect/root.scr::binocular_fire
+end

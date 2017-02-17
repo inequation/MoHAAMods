@@ -1,0 +1,18 @@
+level.ffe_method = "zones" // can be skybox, zones (bounds of zones where fire support cannot be called) or xzones (bounds of the only zones where fire support can be called) or a number for tracing the specified number of units up from the fire mission call location
+
+// zone definitions
+level.ffe_zones[1] = ( -3056 -784 -104 )::( -3272 -528 -104 )
+level.ffe_zones[2] = ( -3768 -528 -104 )::( -2312 704 -104 )
+level.ffe_zones[3] = ( -1896 1160 -96 )::( -1224 680 -96 )
+level.ffe_zones[4] = ( -1544 680 -96 )::( -1544 704 -96 )
+level.ffe_zones[5] = ( -980 -436 -104 )::( -8 232 -104 )
+level.ffe_zones[6] = ( -8 -436 -104 )::( -416 -640 40 )
+level.ffe_zones[7] = ( -392 -896 -104 )::( -32 -976 -104 )
+level.ffe_zones[8] = ( -32 -896 -104 )::( -24 -968 -104 )
+level.ffe_zones[9] = ( 640 -992 -312 )::( 2120 -1800 -312 )
+level.ffe_zones[10] = ( 1488 -1024 -312 )::( 1824 -688 -312 )
+level.ffe_zones[11] = ( 192 1392 -144 )::( 624 1544 -144 )
+level.ffe_zones[12] = ( 624 1544 -144 )::( 128 2008 -144 )
+level.ffe_zones[13] = ( -1768 -1384 -296 )::( -1464 -904 -296 )
+level.ffe_zones[14] = ( -1464 -904 -296 )::( -1220 -1252 -296 )
+end 1 // this is to indicate that the preset ran OK

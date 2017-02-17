@@ -1,0 +1,386 @@
+// Team Command modification AI script
+// Based on Lizardkid's Second Squad script (credits below)
+// Copyright (C) 2006, Leszek "IneQuation" Godlewski
+// http://iqstudios.quakedev.com/
+
+main:
+	level.TC_MOVEDISTANCE	= 250
+	level.TC_MEDICTHRESHOLD = 65	// percent of health at which the medic attempts healing
+	level.TC_MEDICHEALTIME	= 4	// amount of time that needs to pass for the medic to be able to heal again
+	level.jvbot_skill = 3 // because we're using jv's anim scripts
+	while (1) {
+		for (local.i = 1; local.i <= $tc_bot.size; local.i++)
+			$tc_bot[local.i] waitthread bot_frame
+		waitframe
+	}
+end
+
+initbot local.gun local.commander local.index:
+	self targetname "tc_bot"
+	self health 100
+	self.ammo_grenade = 0
+	self.accuracy = 50 // placeholder value
+	self.avoidplayer = 1
+	self.interval = 46 // ~ sqrt(2) * maxs[0] * 2
+	self.movedoneradius = level.TC_MOVEDISTANCE
+	self.attackhandler = "anim/jv_bots/attack.scr"
+	self.mood = "alert"
+
+	self.tc_commander = local.commander
+	self.tc_state = "follow"
+	self.tc_standing = 0
+	self.tc_id = local.index
+	
+	if (local.gun != "medic") {
+		self weapon local.gun
+		self waitthread restore_senses
+	} else { // medic is unarmed and dumb
+		self gun none
+		self.tc_lasthealtime = level.time
+		self waitthread disable_senses
+	}
+	
+end
+
+order local.cmd local.noresponse:
+	for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+		if (isAlive(self.tc_squad[local.i])) {
+			if (!bool(getcvar(tc_shutup))) {
+				if (self.team == american)
+					self.tc_squad[local.i] commanddelay (1.0 + randomfloat(1)) playsound tc_yessuh
+				else
+					self.tc_squad[local.i] commanddelay (1.0 + randomfloat(1)) playsound tc_jawohl
+			}
+			if (self.gun != "none")
+				self.tc_squad[local.i].tc_state = local.cmd
+			// medics just follow the nearest squadmate
+		}
+		self.tc_squad[local.i].tc_standing = 0 // clear these when a new order comes
+		if (self.tc_squad[local.i].tc_firethread) {
+			self.tc_squad[local.i].tc_firethread delete
+			self.tc_squad[local.i] animscript anim/idle.scr
+		}
+	}
+	switch (local.cmd) {
+		case "hold":
+			for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_squad[local.i]))
+					continue
+				if(randomint(100) < 51)
+					self.tc_squad[local.i] exec global/crouch.scr
+				else
+					self.tc_squad[local.i] exec global/stand.scr
+				self.tc_squad[local.i] waitthread restore_senses
+			}
+			break
+		case "coveringfire":
+			local.org = self gettagposition "eyes bone"
+			local.fwdvec = angles_toforward self.viewangles
+			self.tc_targent.origin = trace (local.org + local.fwdvec * 64) (local.org + local.fwdvec * 10240) 0
+			for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_squad[local.i]))
+					continue
+				if(randomint(100) < 51)
+					self.tc_squad[local.i] exec global/crouch.scr
+				else
+					self.tc_squad[local.i] exec global/stand.scr
+				/*self.tc_squad[local.i] thread covering_fire self.tc_targent
+				self.tc_squad[local.i].tc_time1 = level.time - 0.1
+				self.tc_squad[local.i].tc_time2 = level.time*/
+				self.tc_squad[local.i] waitthread disable_senses
+			}
+			break
+		case "follow":
+			/*for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_squad[local.i]))
+					continue
+				//self.tc_squad[local.i] waitthread disable_senses
+				self.tc_squad[local.i] waitthread restore_senses
+				//self.tc_squad[local.i].tc_time1 = level.time - 0.5
+				self.movedoneradius = level.TC_MOVEDISTANCE
+			}*/
+			self notsolid // we need traces to work
+			for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_squad[local.i]))
+					continue
+				self.tc_squad[local.i] waitthread restore_senses
+				self.tc_squad[local.i].tc_target = (trace self.origin (self.origin + ( (randomint(4) * 50) (randomint(4) * 50) 0 )) 1)// - self.origin // this is relative to commander's origin
+iprintlnbold self.tc_squad[local.i].tc_target
+				self.tc_squad[local.i].tc_target -= self.origin
+iprintlnbold self.tc_squad[local.i].tc_target
+				self.movedoneradius = level.TC_MOVEDISTANCE * 0.1
+			}
+			self solid
+			break
+		case "movein":
+			local.org = self gettagposition "eyes bone"
+			local.fwdvec = angles_toforward self.viewangles
+			self.tc_targent.origin = trace (local.org + local.fwdvec * 64) (local.org + local.fwdvec * 10240) 0
+			for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_squad[local.i]))
+					continue
+				self.tc_squad[local.i] waitthread disable_senses
+				self.tc_squad[local.i].tc_time1 = level.time - 0.5
+				self.tc_squad[local.i].tc_target = trace self.tc_targent.origin (self.tc_targent.origin + ( (randomint(4) * 50) (randomint(4) * 50) 0 ))
+				self.movedoneradius = level.TC_MOVEDISTANCE * 0.1
+			}
+			break
+		case "regroup":
+			self.tc_formation++
+			if (self.tc_formation > level.TC_FORM_NUM_FORMATIONS)
+				self.tc_formation = level.TC_FORM_WEDGE
+			break
+		/*case "regroup":
+			for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_squad[local.i]))
+					continue
+				self.tc_squad[local.i] waitthread disable_senses
+				self.tc_squad[local.i].tc_time1 = level.time - 0.5
+				self.tc_squad[local.i].tc_target = (trace self.origin (self.origin + ( (randomint(4) * 50) (randomint(4) * 50) 0 )) 1) - self.origin // this is relative to commander's origin
+				self.movedoneradius = level.TC_MOVEDISTANCE * 0.1
+			}
+			break*/
+	}
+end
+
+bot_frame:
+	self.painhandler = "anim/jv_bots/pain.scr" // get rid of the pain animations
+	if (!self.tc_commander)
+		self damage $world 10000 $world ( 0 0 0 ) ( 0 0 0 ) ( 0 0 0 ) 0 32 1 -1
+	if (self.health <= 0) {
+		self targetname "" // so that the script will not see the bot
+		self commanddelay 10 delete // remove the body after 10 seconds
+		self.tc_commander iprint "You have lost a squad member!" 1
+		if (self.tc_commander.dmteam == allies)
+			local.str = "Allied "
+		else if (self.tc_commander.dmteam == axis)
+			local.str = "Axis "
+		else
+			local.str = ""
+		local.str = local.str + "Team " + level.tc_teamnames[self.tc_commander.tc_teamnameindex] + " has lost a squad member!"
+		for (local.i = 1; local.i < $player.size; local.i++) {
+			if ($player[local.i] == self.tc_commander)
+				continue
+			$player[local.i] iprint local.str 1
+		}
+		end
+	}
+	if (self.gun == "none") { // we're a medic
+		if (level.time > self.tc_lasthealed && self.tc_state != "heal") {
+			self.tc_lasthealed = level.time + 4
+			if (isAlive(self.tc_commander) && self.tc_commander.health * 100 / self.tc_commander.maxhealth < level.TC_MEDIC_THRESHOLD) {
+				self.tc_state = "heal"
+				self thread medic_heal $player
+				end
+			}
+			for (local.i = 0; local.i < self.tc_commander.tc_squadsize; local.i++) {
+				if (self.tc_commander.tc_squad[local.i] != self) {
+					self.tc_state = "heal"
+					self thread medic_heal self.tc_commander.tc_squad[local.i]
+					end
+				}
+			}
+			if ((self.health * 100) / self.maxhealth < 40) {
+				self waitthread medic_canteen
+				self.tc_state = "heal"
+			}
+		} else if (self.tc_state != "heal") {
+			local.closest = self.tc_commander
+			local.dist = vector_length (self.origin - self.tc_commander.origin)
+			for (local.i = 0; local.i <= self.tc_commander.tc_squadsize; local.i++) {
+				if (!isAlive(self.tc_commander.tc_squad[local.i]))
+					continue
+				if (vector_length (self.origin - self.tc_commander.tc_squad[local.i].origin) < local.dist) {
+					local.dist = vector_length (self.origin - self.tc_commander.tc_squad[local.i].origin)
+					local.closest = self.tc_commander.tc_squad[local.i]
+				}
+			}
+			if (local.dist > level.TC_MOVEDISTANCE + 10)
+				self runto local.closest
+			/*if (self.position == stand || self.position == walk || self.position == run)
+				self exec global/crouch.scr*/
+		}
+		end
+	}
+	if (self.tc_state == "hold")
+		end
+	else if (self.tc_state == "coveringfire") {
+		/*if (level.time - self.tc_time1 >= 0.1) {
+			self ai_off
+			self.tc_time1 = level.time + 0.9
+			end
+		}
+		if (level.time - self.tc_time2 > 0) {
+			self ai_on
+			self.tc_time2 = level.time + 0.9
+			end
+		}*/
+		// let's see if we can see the target clearly
+		self notsolid // make us notsolid for the time of the sighttrace
+		//if (!sighttrace (self gettagposition "eyes bone") (self.tc_commander.tc_targent.origin) 0 ( -16 -16 -16 ) ( 16 16 16 )) {
+		if (!self cansee self.tc_commander.tc_targent 360) {
+			self solid
+			self runto self.tc_commander
+		} else if (!self.tc_firethread) {
+			self solid
+			self.tc_firing = 1
+			self turnto self.tc_commander.tc_targent
+			//self aimat (self.tc_commander.tc_targent.origin + + ((randomint(10) * 10) (randomint(10) * 10) (randomint(5) * 10)))
+			self thread covering_fire self.tc_commander.tc_targent
+			/*if (self.roundsinclip > 0)
+				self fire
+			else
+				self exec anim/reload.scr::Reload 1 0*/
+		}
+		end
+	} else if (self.tc_state == "movein") {
+		if (vector_within self.origin self.tc_target 75) {
+			if(randomint(100) < 41)
+				self exec global/crouch.scr
+			else
+				self exec global/stand.scr
+			self waitthread restore_senses
+			self.tc_state = "hold"
+			end
+		}
+		if (level.time - self.tc_time1 >= 0.5) {
+			self.tc_time1 = level.time + 0.5
+			self runto self.tc_target
+		}
+		end
+	} else if (self.tc_state == "regroup") {
+		if (vector_within self.origin self.tc_target 75) {
+			if(randomint(100) < 41)
+				self exec global/crouch.scr
+			else
+				self exec global/stand.scr
+			self waitthread restore_senses
+			self.tc_state = "hold"
+			end
+		}
+		if (level.time - self.tc_time1 >= 0.5) {
+			self.tc_time1 = level.time + 0.5
+			self runto (self.tc_commander.origin + self.tc_target)
+		}
+		end
+	} else if (self.tc_state == "follow") {
+		if (self.thinkstate == "attack")
+			end
+		// match the commander's stance
+		if ((self.position == stand || self.position == walk || self.position == run) && (self.tc_commander getposition) == "crouching")
+			self exec global/crouch.scr
+		else if ((self.position == crouch || self.position == crouchwalk || self.position == crouchrun) && (self.tc_commander getposition) == "standing")
+			self exec global/stand.scr
+		/*if (!vector_within self.tc_commander.origin self.origin (level.TC_MOVEDISTANCE + 10)) {
+			self runto self.tc_commander
+			self.tc_standing = 0
+		} else if (self.position != stand && self.position != walk && self.position != run)
+			self exec global/stand.scr
+		end*/
+		local.vec = ( self.tc_pos[0] self.tc_pos[1] 0 )
+		if (vector_within self.origin local.vec 23)
+			local.dest = NULL
+		else
+			local.dest = self.tc_pos
+		if ((self.tc_commander getmovement) == "running")
+			self runto local.dest
+		else
+			self walkto local.dest
+		end
+	}
+end
+
+covering_fire local.target:
+	// there is a trace done in bot_frame
+	/*local.ent = spawn script_origin
+	local.head = self gettagposition "eyes bone"
+	local.dir = vector_normalize(local.target.origin - local.head)
+	local.ent.origin = trace (local.head + local.dir * 23) local.target.origin 0
+	// try not to shoot your teammates' backs
+	for (local.i = 0; local.i < self.tc_commander.tc_squadsize; local.i++) {
+		if (local.ent isTouching self.tc_commander.tc_squad[local.i]) {
+			self exec global/stand.scr
+			self.tc_commander.tc_squad[local.i] exec global/crouch.scr
+		}
+	}
+	local.ent delete*/
+	self.tc_firethread = parm.previousthread
+	while(isAlive(self) && self.tc_state == "coveringfire") {
+		self turnto local.target
+		self exec global/aimat.scr (local.target.origin + ((randomint(10) * 10) (randomint(10) * 10) (randomint(5) * 10)))
+		wait 1
+
+		for(local.i = 5; local.i > 0; local.i--) {
+			self exec global/aimat.scr (local.target.origin + ((randomint(10) * 10) (randomint(10) * 10) (randomint(10) * 10)))
+			self exec global/shoot.scr
+			wait 0.3
+		}
+		wait 0.5
+		self reloadweapon
+		self waittill animdone
+	}
+end
+
+disable_senses:
+	self.hearing = 1
+	self.sight = 1
+	self.fov = 1
+	self.enableEnemy = 0
+	self ai_off
+end
+
+restore_senses:
+	self.hearing = 2048
+	self.sight = waitthread get_sight_range
+	self.fov = 90
+	self.enableEnemy = 1
+	self ai_on
+end
+
+get_sight_range:
+	if (!$world.farplane)
+		end 2048
+end $world.farplane
+
+medic_heal local.ent:
+	if (!isAlive(local.ent))
+		end
+	if ((local.ent.health * 100) / local.ent.maxhealth > 65)
+		end
+	self.no_idle = 0
+	self.movedoneradius = 100
+	self runto local.ent
+	self waittill movedone
+	self exec global/stand.scr
+	if (isAlive(local.ent)) {
+		if (vector_within self.origin local.ent.origin 140) {
+			self nodamage
+			self.avoidplayer = 0
+			self upperanim pass_canteen_start
+			self waittill upperanimdone
+			local.ent heal 0.5
+			self playsound med_kit
+			self upperanim pass_canteen_end
+			self waittill upperanimdone
+			self.avoidplayer = 1
+			self takedamage
+		}
+	}
+	self.tc_state = "follow"
+end
+
+medic_canteen:
+	if (self.tc_canteen == NIL)
+		self.tc_canteen = 0
+	self.tc_canteen++
+	if (self.canteen < 3) {
+		wait 1
+		self lookat NULL
+		self nodamage
+		self upperanim pass_canteen_drink
+		self waittill upperanimdone
+		self takedamage
+		self.health = self.maxhealth
+	}
+	self.tc_state = "follow"
+end

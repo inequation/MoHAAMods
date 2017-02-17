@@ -1,0 +1,64 @@
+Plik            : Survival Horror
+Autor           : IneQuation a.k.a. Rookie One
+Wersja          : 0.7 Halloween Edition
+Data            : 01.11.2006
+
+Opis            :
+Grupkê ludzi terroryzuje ulotny morderca. Niewidzialny, ze œmiercionoœn¹ broni¹ w rêku, mo¿e podkraœæ siê do Ciebie niezauwa¿ony i zabiæ Ciê. Czy prze¿yj¹? A mo¿e morderca ich wszystkich wyeliminuje? Niech zacznie siê horror!
+
+Jeden z graczy (ten, który gra³ jako morderca najmniej razy) jest wybierany na mordercê i otrzymuje pistolet z t³umikiem z nieograniczon¹ amunicj¹ i zadaj¹cy wiêksze obra¿enia. Nie mo¿e u¿ywaæ innych broni ani wyrzucaæ swojego pistoletu by daæ go jakiemukolwiek innemu graczowi. Jest niewidzialny, ale pojawia siê na u³amek sekundy w momencie, gdy strzela lub dotyka innego gracza, œwiec¹c na czerwono. Inni, widz¹c lub s³ysz¹c mordercê, strzelaj¹ na oœlep naoko³o, modl¹c siê, by ich pociski go trafi³y. ;)
+
+No i jest jeszcze parê efektów, które tworz¹ odpowiedni¹ atmosferê - noc, burza z piorunami, "podejrzana" muzyka i niepokoj¹ce odg³osy.
+
+Wielkie dziêki dla Elgana i JoeyaC za hostowanie moda na swoich serwerach, a dla Arta i At0mica za testowanie! :)
+
+Za pomoc¹ cvaru nohorror mo¿na moda wy³¹czyæ (nohorror 1; dzia³a po restarcie), natomiast cvar horror_timelimit pozwala okreœliæ d³ugoœæ tury mordercy w sekundach.
+
+Znane bugi      :
+Na pocz¹tku ka¿dej rundy przez 10 sekund nic siê nie dzieje. Z jakiegoœ powodu jest wymagana do dzia³ania moda, nie pytajcie mnie dlaczego, nie mam pojêcia. Czasem te¿ mo¿e siê zdarzyæ, ¿e proces wyboru mordercy przebiega parê razy, zanim w³aœciwie zostanie wybrany, ale nie przejmuj siê tym, tylko poczekaj, zaraz zadzia³a. ;)
+
+Instalacja      :
+Skopiuj plik zzzuser-Rookie_One-Survival_Horror-v0.7.pk3 do Twojego katalogu MoHAA/main. Mod wymaga trybu gry Team Match - g_gametype 2. Dzia³a na ka¿dej mapie. Polecam grê z w³¹czonym "przyjaznym ogniem" (g_teamdamage 1) dla wiêkszego zamieszania. :P
+
+
+Historia wersji :
+0.7
+ o poprawiono b³¹d, który powodowa³, ¿e gra czasem w ogóle nie startowa³a - to by³ bardzo g³upi b³¹d logiczny,
+ o nowy system wyboru mordercy - teraz bierze on pod uwagê ilê razy dany gracz gra³ jako morderca,
+ o gracze, którzy sami do³¹cz¹ do osi s¹ teraz wykopywani do trybu obserwatora zamiast przeja¿d¿ki respawnowej,
+ o dodano niepokoj¹ce odg³osy dla atmosfery. :P
+
+0.6
+ o wreszcie wszystko dzia³a mniej wiêcej jak trzeba.
+
+0.5
+ o ma³e poprawki w kodzie wymuszania dru¿yn,
+ o ró¿ne inne poprawki i zmiany, których w tej chwili nie pamiêtam. ;)
+
+0.4
+ o napisano od nowa procedurê obs³ugi graczy (inne, bardziej efektywne podejœcie),
+ o dopracowano kod "pojawiania siê" mordercy,
+ o ró¿ne drobne poprawki w kodzie wymuszania dru¿yn,
+ o poprawiono b³¹d, który czasami powodowa³ zawieszenie serwera z b³êdem przepe³nienia bufora poleceñ,
+ o drobne poprawki w kodzie odpowiedzialnym za obs³ugê broni mordercy.
+
+0.3
+ o napisano od nowa kod odpowiedzialny za wymuszanie druzyn,
+ o dodano efekty burzy,
+ o usuniêto pozosta³e rzeczy potrzebne do debugowania.
+
+0.2
+Zmieniono koncepcjê moda. Pierwsza grywalna wersja.
+
+0.1
+Pierwsza wersja.
+
+Kontakt         :
+e-mail          : rookie_one@army.com
+Gadu-Gadu       : 2134786
+Jabber          : r00kie_0ne@chrome.pl
+Tlen            : rookie_one@tlen.pl
+
+--------------------------------------------------------------------
+
+Ten mod nie mo¿e byæ modyfikowany bez mojego pozwolenia.

@@ -1,0 +1,2 @@
+level.ffe_method = "skybox" // can be skybox, zones (bounds of zones where fire support cannot be called) or xzones (bounds of the only zones where fire support can be called) or a number for tracing the specified number of units up from the call location
+end 1 // this is to indicate that the preset ran OK

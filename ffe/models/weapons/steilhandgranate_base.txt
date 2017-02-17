@@ -1,0 +1,160 @@
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+//	scale 0.55			// Seems to work better than 0.52
+	path models/weapons/steilhandgranate
+	skelmodel steilhandgranate.skd
+	surface all shader stielhandgranate
+
+
+}
+
+init
+{
+	server
+	{
+		classname		Weapon
+		weapontype		grenade
+		name			"Stielhandgranate"
+		rank			520 520
+
+		// prevents players from dropping smoke nades
+		notdroppable
+
+		pickupsound		steilhandgranate_snd_pickup
+		ammopickupsound	steilhandgranate_snd_pickup_ammo
+		noammosound		steilhandgranate_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine1"
+//		holsteroffset	"3.12 10.5 3.64"
+//		holsterangles	"20 -40 0"
+//		holsterScale	1.0
+
+		// Primary fire type info (fast, arcing throw)
+		firetype		projectile
+		ammotype		"agrenade"
+		projectile		models/projectiles/steilhandgranate_primary.tik
+		semiauto
+		clipsize		1
+		startammo		1
+		ammorequired	1
+		firedelay		0.75
+		maxchargetime	4.0
+		minchargetime	0.6
+		crosshair		0
+		quiet // don't notify AI of it being fired
+		autoputaway 	1 // automatically put the weapon away when out of ammo
+		usenoammo		0 // don't allow it to be used when it has no ammo
+		movementspeed	1.0
+
+		// Secondary fire type info (more controllable, straight throw)
+		shareclip
+		secondary firetype		projectile
+		secondary ammotype		"agrenade"
+		secondary projectile	models/projectiles/steilhandgranate.tik
+		secondary clipsize		1
+		secondary ammorequired	1
+		secondary firedelay		0.75
+		secondary maxchargetime	1.5
+		secondary minchargetime	0.5
+
+		// AI animation group info
+		weapongroup		grenade
+
+		// DM Attributes
+		dmprojectile		models/projectiles/steilhandgranate_primary.tik
+		dmstartammo			1
+		dmammorequired		1
+		dmfiredelay			0.75
+		dmcrosshair			0
+		dmmovementspeed		1.0
+		secondary dmprojectile	models/projectiles/steilhandgranate.tik
+		secondary dmammorequired	1
+		secondary dmfiredelay		0.75
+
+		cache models/projectiles/steilhandgranate_primary.tik
+		cache models/projectiles/steilhandgranate.tik
+	}
+	client
+	{
+	}
+}
+
+animations
+{
+	raise steilhandgranate.skc
+	{
+		// if we're pulling out grenades, we've definatly got 'em
+		server
+		{
+			enter surface all -nodraw
+		}
+	}
+	idle   steilhandgranate.skc
+	{
+		server
+		{
+			enter surface all -nodraw
+		}
+	}
+
+	// this should make sure that it doesn't look like there's a grenade in hand when you don't have one
+	idle_empty steilhandgranate.skc
+	{
+		server
+		{
+			enter surface all +nodraw
+		}
+	}
+
+	charge steilhandgranate.skc
+	{
+		client
+		{
+			enter sound steilhandgranate_snd_grenade_pull weapon
+		}
+	}
+	secondarycharge steilhandgranate.skc
+	{
+		client
+		{
+			enter sound steilhandgranate_snd_grenade_pull weapon
+		}
+	}
+
+	fire   steilhandgranate.skc
+	{
+		server
+		{
+			first shoot
+			first surface all +nodraw
+//			15 surface all -nodraw
+		}
+		client
+		{
+			first sound steilhandgranate_snd_grenade_throw weapon
+		}
+	}
+	secondaryfire   steilhandgranate.skc
+	{
+		server
+		{
+			first shoot secondary
+			first surface all +nodraw
+//			15 surface all -nodraw
+		}
+		client
+		{
+			first sound steilhandgranate_snd_grenade_throw weapon
+		}
+	}
+
+	reload  steilhandgranate.skc
+	{
+		server
+		{
+			2 surface all -nodraw
+		}
+	}
+}

@@ -1,0 +1,385 @@
+// Team Command modification main script
+// Copyright (C) 2006, Leszek "IneQuation" Godlewski
+// http://iqstudios.quakedev.com/
+
+main:
+	if (level.tc_running)
+		end
+	level.tc_running = 1
+	
+	if (getcvar(tc_name) == "") {
+		println "tcs: ERROR: TC game library hook is not running!"
+		end
+	}
+	
+	if (int(getcvar(g_gametype)) < 2) {
+		println "tcs: not a team-based gametype, terminating"
+		end
+	}
+
+	level.TC_FORM_WEDGE		= 0
+	level.TC_FORM_LINE		= 1
+	level.TC_FORM_COLUMN		= 2
+	level.TC_FORM_NUM_FORMATIONS	= 3
+	
+	// advertising :)
+	local.gs = getcvar(g_gametypestring)
+	local.gs = "Team Command: " + local.gs
+	setcvar "g_gametypestring" local.gs
+	
+	level.tc_teamnames = "Alpha"::"Bravo"::"Charlie"::"Delta"::"Echo"::"Foxtrot"::"Golf"::"Hotel"::"India"::"Juliet"::"Kilo"::"Lima"::"Mike"::"November"::"Oscar"::"Papa"::"Quebec"::"Romeo"::"Sierra"::"Tango"::"Uniform"::"Victor"::"Whiskey"::"Xray"::"Yankee"::"Zulu"::"Nadazero"::"Unaone"::"Bissotwo"::"Terrathree"::"Kartefour"::"Pantafive"::"Soxisix"::"Setteseven"::"Oktoeight"::"Novenine"
+	
+	level waittill prespawn
+	
+	local.master = spawn ScriptMaster
+	local.master alias tc_yessuh1 sound/dialogue/Multiplayer/a/AMdfr_r_01a.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_yessuh2 sound/dialogue/Multiplayer/a/AMdfr_r_01z.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_yessuh3 sound/dialogue/Multiplayer/a/AMdfr_r_01h.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_yessuh4 sound/dialogue/Multiplayer/a/AMdfr_r_01j.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_yessuh5 sound/dialogue/Multiplayer/a/AMdfr_r_01h.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_jawohl1 sound/dialogue/Multiplayer/g/GRden_r_01c.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_jawohl2 sound/dialogue/Multiplayer/g/GRden_r_01i.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_jawohl3 sound/dialogue/Multiplayer/g/GRden_r_01b.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_jawohl4 sound/dialogue/Multiplayer/g/GRden_r_01d.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	local.master alias tc_jawohl5 sound/dialogue/Multiplayer/g/GRden_r_01a.WAV soundparms 1.0 0.0 1.0 0.0 160 3000 dialog streamed subtitle "Yes sir!" maps "train m dm obj"
+	
+	level waittill spawn
+	
+	println "tcs: initializing AI"
+	exec global/teamcommand/ai.scr
+	
+	println "tcs: spawning a bot to suppress the lag later on"
+	local.bot = spawn Actor model "models/human/multiplayer_allied_airborne_soldier.tik" origin ( 0 0 0)
+	waitframe
+	local.bot delete
+	
+	println "tcs: starting main script loop"
+	while (1) {
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if (!$player[local.i].tc_done) {
+				$player[local.i].tc_done = 1
+				$player[local.i] thread client_begin
+			} else if ($player[local.i].tc_ingame) {
+				if (!isAlive($player[local.i]) || $player[local.i].dmteam != $player[local.i].tc_origteam)
+					$player[local.i] waitthread client_death
+				else
+					$player[local.i] waitthread client_frame
+			}
+		}
+		waitframe
+	}
+end
+
+client_begin:
+	self threatbias ignoreme
+	local.trg = spawn trigger_multiple origin self.origin
+	local.trg glue self
+	local.trg.player = self
+	local.trg setthread global/teamcommand/main.scr::client_spawned
+	while (self != NIL && self != NULL && local.trg != NIL && local.trg != NULL)
+		waitframe
+	if (local.trg != NIL && local.trg != NULL)
+		local.trg delete
+end
+
+client_spawned:
+	if (parm.other != self.player)
+		end
+	self.player stufftext "globalwidgetcommand dday1 shader townhallwindow"
+	self.player stufftext "globalwidgetcommand dday1 fgcolor 1 1 1 1"
+	self.player stufftext "globalwidgetcommand dday1 bgcolor 0 0 0 0"
+	self.player stufftext "globalwidgetcommand dday1 fadein 0"
+	self.player stufftext "globalwidgetcommand dday1 menu dday1 640 480 NONE 0"
+	self.player stufftext "globalwidgetcommand dday1 virtualres 1"
+	self.player stufftext "globalwidgetcommand dday1 fullscreen 1"
+	self.player stufftext "globalwidgetcommand dday1 align left top"
+	self.player stufftext "globalwidgetcommand june6 borderstyle NONE"
+	self.player stufftext "globalwidgetcommand june6 shader townhallwindow"
+	self.player stufftext "globalwidgetcommand june6 rect 8 420 512 12"
+	//self.player stufftext "globalwidgetcommand june6 rect -110 590 512 12"
+	self.player stufftext "globalwidgetcommand june6 fgcolor 1 1 1 1"
+	self.player stufftext "globalwidgetcommand june6 bgcolor 0 0 0 0"
+	self.player stufftext "globalwidgetcommand june6 font facfont-20"
+	self.player stufftext "globalwidgetcommand june6 linkcvar tc_status"
+	self.player stufftext "showmenu dday1"
+	self.player threatbias 0
+	if(self.player.dmteam == axis)
+		self.player german
+	else
+		self.player american
+	self.player.tc_targent = spawn script_origin
+	self.player.tc_origteam = self.player.dmteam
+	self.player.tc_ingame = 1
+	self.player.tc_teamnameindex = randomint(level.tc_teamnames.size) + 1
+	self.player.tc_formation = level.TC_FORM_WEDGE
+	for (local.i = 1; local.i <= level.tc_teamnames.size; local.i++) {
+		local.found = 1
+		for (local.j = 1; local.j <= $player.size; local.j++) {
+			if (!$player[local.j].tc_ingame || $player[local.j].dmteam != self.player.dmteam)
+				continue
+			if ($player[local.j].tc_teamnameindex == local.i) {
+				local.found = 0
+				break
+			}
+		}
+		if (local.found) {
+			self.player.tc_teamnameindex = local.i
+			break
+		}
+	}
+	self.player waitthread spawn_squad
+	self.player waitthread update_display
+	self delete
+end
+
+client_frame:
+	local.cmd = getcvar("tc_client" + self.entnum)
+	setcvar ("tc_client" + self.entnum) ""
+	local.changed = 0
+	if (self.origin != self.tc_lastorigin) { // update only when we move
+		self.tc_lastorigin = self.origin
+		local.moved = 1
+	} else
+		local.moved = 0
+	local.average = ( 0 0 0 )
+	local.num = 0
+	for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+		if (isAlive(self.tc_squad[local.i])) {
+			local.average += self.tc_squad[local.i].origin
+			local.num++
+		}
+	}
+	local.average = ( (local.average[0] / float(local.num)) (local.average[1] / float(local.num)) (local.average[2] / float(local.num)) )
+	local.radius = float(self.tc_squad.size + 1) / 4.0 * 96.0
+	local.centre = trace self.origin (self.origin + ((vector_normalize (local.average - self.origin)) * local.radius)) 1
+	local.index = 1
+	for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+		if (self.tc_squadhealth[local.i] == NIL) {
+			iprintlnbold local.i " " self.tc_squadsize
+			continue
+		}
+		if (!isAlive(self.tc_squad[local.i]) && self.tc_squadhealth[local.i] > 0) {
+			local.changed = 1
+			self.tc_squadhealth[local.i] = 0
+		}
+		if (self.tc_squad[local.i].health != self.tc_squadhealth[local.i] && self) {
+			local.changed = 1
+			self.tc_squadhealth[local.i] = self.tc_squad[local.i].health
+		}
+		if (isAlive(self.tc_squad[local.i]) && local.moved) {			
+			self.tc_squad[local.i].tc_pos = trace local.centre (local.centre + angles_toforward(( 0 (self.viewangles[1] - local.index * 360.0 / (self.tc_squad.size + 1)) 0 )) * local.radius)
+			local.index++
+		}
+	}
+	if (local.changed)
+		self waitthread update_display
+	if (local.cmd == "")
+		end
+	
+	switch (local.cmd) {
+		case "15":
+				//println "tcs: hold position order received"
+				self waitthread global/teamcommand/ai.scr::order "hold"
+				break
+		case "16":
+				//println "tcs: covering fire order received"
+				self waitthread global/teamcommand/ai.scr::order "coveringfire"
+				break
+		case "23":
+				//println "tcs: follow me order received"
+				self waitthread global/teamcommand/ai.scr::order "follow"
+				break
+		case "11":
+				//println "tcs: move in order received"
+				self waitthread global/teamcommand/ai.scr::order "movein"
+				break
+		case "12":
+				//println "tcs: fall back order received"
+				self waitthread global/teamcommand/ai.scr::order "fallback"
+				break
+		case "17":
+				//println "tcs: regroup order received"
+				self waitthread global/teamcommand/ai.scr::order "regroup"
+				break
+		/*case "21":
+				//println "tcs: cover me order received"
+				self waitthread global/teamcommand/ai.scr::order "coverme"
+				break*/
+		default:
+				//println "tcs: unhandled order " local.cmd
+				end
+	}
+end
+
+spawn_squad:
+	local.squadsize = int(getcvar(tc_squadsize))
+	if (local.squadsize < 1)
+		end
+	self.tc_squadsize = local.squadsize
+	// select squadmates' model set depending on our skin
+	// local.models[0] always gets the SMG, he's the guy with the highest rank after the player
+	switch (self.model) {
+		case "models/player/allied_airborne.tik":
+			local.models[0] = "models/human/multiplayer_allied_airborne_soldier.tik"
+			break
+		case "models/player/allied_manon.tik":
+		case "models/player/allied_sas.tik":
+		case "models/player/allied_pilot.tik":
+			local.models[0] = "models/human/multiplayer_allied_oss_man.tik"
+			local.models[1] = "models/human/multiplayer_allied_pilot.tik"
+			break
+		case "models/player/american_army.tik":
+		case "models/player/american_ranger.tik":
+			local.models[0] = "models/human/multiplayer_allied_1st-ranger_sergeant.tik"
+			local.models[1] = "models/human/multiplayer_allied_1st-ranger_private.tik"
+			local.models[2] = "models/human/multiplayer_allied_29th_private.tik"
+			break
+		case "models/player/german_afrika_officer.tik":
+		case "models/player/german_afrika_private.tik":
+			local.models[0] = "models/human/multiplayer_german_afrika_NCO.tik"
+			local.models[1] = "models/human/multiplayer_german_afrika_grenadier.tik"
+			local.models[2] = "models/human/multiplayer_german_afrika_private.tik"
+			break
+		case "models/player/german_elite_officer.tik":
+		case "models/player/german_elite_sentry.tik":
+			local.models[0] = "models/human/multiplayer_german_elite_sentry.tik"
+			break
+		case "models/player/german_kradshutzen.tik":
+		case "models/player/german_wehrmacht_officer.tik":
+		case "models/player/german_wehrmacht_soldier.tik":
+			local.models[0] = "models/human/multiplayer_german_wehrmacht_NCO.tik"
+			local.models[1] = "models/human/multiplayer_german_misc_kradshutzen.tik"
+			local.models[2] = "models/human/multiplayer_german_wehrmacht_grenadier.tik"
+			local.models[3] = "models/human/multiplayer_german_wehrmacht_soldier.tik"
+			break
+		case "models/player/german_panzer_grenadier.tik":
+		case "models/player/german_panzer_obershutze.tik":
+		case "models/player/german_panzer_shutze.tik":
+		case "models/player/german_panzer_tankcommander.tik":
+			local.models[0] = "models/human/multiplayer_german_panzer_obershutze.tik"
+			local.models[1] = "models/human/multiplayer_german_panzer_grenadier.tik"
+			local.models[2] = "models/human/multiplayer_german_panzer_shutze.tik"
+			break
+		case "models/player/german_scientist.tik":
+		case "models/player/german_worker.tik":
+			local.models[0] = "models/human/multiplayer_german_misc_worker.tik"
+			break
+		case "models/player/german_waffenss_officer.tik":
+		case "models/player/german_waffenss_shutze.tik":
+			local.models[0] = "models/human/multiplayer_german_waffenss_NCO.tik"
+			local.models[1] = "models/human/multiplayer_german_waffenss_shutze.tik"
+			break
+		case "models/player/german_winter_1.tik":
+		case "models/player/german_winter_2.tik":
+			local.models[0] = "models/human/multiplayer_german_winter_type1.tik"
+			local.models[1] = "models/human/multiplayer_german_winter_type2.tik"
+			break
+		default:
+			if (self.dmteam == allies) {
+				local.models[0] = "models/human/multiplayer_allied_1st-ranger_sergeant.tik"
+				local.models[1] = "models/human/multiplayer_allied_1st-ranger_private.tik"
+				local.models[2] = "models/human/multiplayer_allied_29th_private.tik"
+			} else {
+				local.models[0] = "models/human/multiplayer_german_wehrmacht_NCO.tik"
+				local.models[1] = "models/human/multiplayer_german_wehrmacht_grenadier.tik"
+				local.models[2] = "models/human/multiplayer_german_wehrmacht_soldier.tik"
+			}
+			break
+	}
+	
+	if (self.dmteam == allies) {
+		local.smg = "thompson"
+		local.mg = "bar"
+		local.rifle = "m1 garand"
+		local.sniper = "springfield '03 sniper"
+		local.medic = "models/human/2nd-ranger_medic.tik"
+	} else {
+		local.smg = "mp40"
+		local.mg = "stg44"
+		local.rifle = "mauser kar 98k"
+		local.sniper = "mauser kar 98d sniper"
+		local.medic = "models/human/german_misc_scientist.tik"
+	}
+	local.weapons = local.rifle::local.smg::local.mg
+	
+	// spawn an NCO with an SMG first
+	self.tc_squad[0] = spawn Actor model local.models[0] origin (waitthread get_spawn_origin self)
+	self.tc_squad[0] waitthread global/teamcommand/ai.scr::initbot local.smg self 0
+	if (local.squadsize > 1) {
+		// spawn an MG gunner
+		self.tc_squad[1] = spawn Actor model local.models[randomint(local.models.size)] origin (waitthread get_spawn_origin self)
+		self.tc_squad[1] waitthread global/teamcommand/ai.scr::initbot local.mg self 1
+	}
+	if (local.squadsize > 2) {
+		// spawn a rifleman
+		self.tc_squad[2] = spawn Actor model local.models[randomint(local.models.size)] origin (waitthread get_spawn_origin self)
+		self.tc_squad[2] waitthread global/teamcommand/ai.scr::initbot local.rifle self 2
+	}
+	if (local.squadsize > 3) {
+		// spawn a sniper
+		self.tc_squad[3] = spawn Actor model local.models[randomint(local.models.size)] origin (waitthread get_spawn_origin self)
+		self.tc_squad[3] waitthread global/teamcommand/ai.scr::initbot local.sniper self 3
+	}
+	if (local.squadsize > 4) {
+		// spawn a medic
+		self.tc_squad[4] = spawn Actor model local.medic origin (waitthread get_spawn_origin self)
+		self.tc_squad[4] waitthread global/teamcommand/ai.scr::initbot "medic" self 4
+	}
+	if (local.squadsize > 5) {
+		for (local.i = 5; local.i < local.squadsize; local.i++) {
+			self.tc_squad[local.i] = spawn Actor model local.models[randomint(local.models.size)] origin (waitthread get_spawn_origin self)
+			self.tc_squad[local.i] waitthread global/teamcommand/ai.scr::initbot local.weapons[randomint(local.weapons.size) + 1] self local.i
+		}
+	}
+	for (local.i = 0; local.i < local.squadsize; local.i++) {
+		self.tc_squadhealth[local.i] = self.tc_squad[local.i].health
+		iprintlnbold local.i " " self.tc_squadhealth[local.i]
+	}
+end
+
+update_display:
+	if (self.tc_squadsize <= 0)
+		end
+	local.str = "set tc_status Team " + level.tc_teamnames[self.tc_teamnameindex] + " | "
+	/*local.str = local.str + "SMG: "
+	if (isAlive(self.tc_squad[0]))
+		local.str = local.str + int(self.tc_squad[0].health) + " MG: "
+	else
+		local.str = local.str + "K.I.A. MG: "
+	if (isAlive(self.tc_squad[1]))
+		local.str = local.str + int(self.tc_squad[1].health) + " Rifle: "
+	else
+		local.str = local.str + "K.I.A. Rifle: "
+	if (isAlive(self.tc_squad[2]))
+		local.str = local.str + int(self.tc_squad[2].health)
+	else
+		local.str = local.str + "K.I.A."*/
+	local.average = 0
+	for (local.i = 0; local.i < self.tc_squadhealth.size; local.i++) {
+		if (self.tc_squadhealth[local.i] > 0) { // don't add negative values to the average
+			local.average += self.tc_squadhealth[local.i]
+			local.str = local.str + "#" + (local.i + 1) + ": " + int(self.tc_squadhealth[local.i]) + " "
+		} else
+			local.str = local.str + "#" + (local.i + 1) + ": K.I.A. "
+	}
+	local.average = float(local.average) / float(self.tc_squadhealth.size) / 100.0
+	self stufftext ("globalwidgetcommand june6 fgcolor " + (1.0 - local.average) + " " + local.average + " 0 1")
+	self stufftext local.str
+end
+
+client_death:
+	self.tc_ingame = 0
+	self.tc_done = 0
+	self.tc_targent delete
+	for (local.i = 0; local.i < self.tc_squadsize; local.i++) {
+		if (isAlive(self.tc_squad[local.i]))
+			self.tc_squad[local.i] damage $world 10000 $world ( 0 0 0 ) ( 0 0 0 ) ( 0 0 0 ) 0 32 1 -1
+	}
+	self stufftext "hidemenu dday1"
+end
+
+get_spawn_origin local.player:
+	local.point = local.player.origin + angles_toforward ( 0 (randomint(360)) 0 ) * 75
+	while (!sighttrace local.player.origin local.point 1 ( -16 -16 92 ) ( 16 16 92 ))
+		local.point = local.player.origin + angles_toforward ( 0 (randomint(360)) 0 ) * 75
+end local.point
