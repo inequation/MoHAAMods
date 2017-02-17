@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="server" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Linux">
+				<Option platforms="Unix;" />
+				<Option output="bin/linux/fgame.so" prefix_auto="0" extension_auto="0" />
+				<Option object_output="obj/linux/" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+					<Add option="-nostdlib" />
+					<Add library="dl" />
+				</Linker>
+			</Target>
+			<Target title="Win32">
+				<Option platforms="Windows;" />
+				<Option output="bin/win32/gamex86.dll" prefix_auto="0" extension_auto="0" />
+				<Option object_output="obj/win32/" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+			<Target title="MinGW32 cross-compilation for Win32">
+				<Option platforms="Unix;Mac;" />
+				<Option output="bin/win32/gamex86.dll" prefix_auto="0" extension_auto="0" />
+				<Option object_output="obj/win32/" />
+				<Option type="3" />
+				<Option compiler="mingw32" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Unit filename="src/bg_pmove.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/fgame/g_game.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/fgame/g_game.h" />
+		<Unit filename="src/fgame/g_main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/fgame/g_main.h" />
+		<Unit filename="src/q_strings.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/q_strings.h" />
+		<Unit filename="src/shared.h" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+			<envvars />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
